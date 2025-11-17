@@ -31,76 +31,308 @@ impl ShellcodeDetector {
     }
 
     fn initialize_signatures(&mut self) {
-        // GetProcAddress hash resolution pattern (common in position-independent code)
+        // ===== PEB/TEB Access Patterns (Windows) =====
+
+        // x86 PEB Access via FS segment
         self.signatures.push(ShellcodeSignature {
-            pattern: vec![0x64, 0x8B, 0x25, 0x30, 0x00, 0x00, 0x00], // mov esp, fs:[0x30]
+            pattern: vec![0x64, 0x8B, 0x15, 0x30, 0x00, 0x00, 0x00], // mov edx, fs:[0x30]
             mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00],
-            name: "PEB Access Pattern",
-            confidence: 0.7,
+            name: "x86 PEB Access (fs:[0x30])",
+            confidence: 0.85,
+        });
+
+        // x86 PEB Access variant
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x64, 0xA1, 0x30, 0x00, 0x00, 0x00], // mov eax, fs:[0x30]
+            mask: vec![0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00],
+            name: "x86 PEB Access (fs:[0x30] via eax)",
+            confidence: 0.85,
+        });
+
+        // x64 PEB Access via GS segment
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00], // mov rax, gs:[0x60]
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00],
+            name: "x64 PEB Access (gs:[0x60])",
+            confidence: 0.9,
+        });
+
+        // x64 TEB Access
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x65, 0x48, 0x8B, 0x04, 0x25, 0x30, 0x00, 0x00, 0x00], // mov rax, gs:[0x30]
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00],
+            name: "x64 TEB Access (gs:[0x30])",
+            confidence: 0.8,
+        });
+
+        // ===== API Hashing Patterns =====
+
+        // ROR 13 hash (Metasploit style)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xC1, 0xCF, 0x0D, 0x01, 0xC7], // ror edi, 0xD; add edi, eax
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "ROR13 API Hash (Metasploit)",
+            confidence: 0.95,
+        });
+
+        // ROR 13 hash variant
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xC1, 0xCA, 0x0D, 0x01, 0xC2], // ror edx, 0xD; add edx, eax
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "ROR13 API Hash Variant",
+            confidence: 0.95,
+        });
+
+        // x64 ROR 13 hash
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x48, 0xC1, 0xC9, 0x0D], // ror rcx, 0xD
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF],
+            name: "x64 ROR13 API Hash",
+            confidence: 0.9,
+        });
+
+        // FNV-1a hash pattern
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x69, 0xC0, 0x01, 0x00, 0x01, 0x00], // imul eax, eax, 0x01000193
+            mask: vec![0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00],
+            name: "FNV-1a Hash Pattern",
+            confidence: 0.85,
+        });
+
+        // ===== Shellcode Prologues =====
+
+        // Metasploit x64 staged reverse TCP
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8], // CLD; and rsp, -16; call
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Metasploit x64 Reverse TCP",
+            confidence: 0.98,
+        });
+
+        // Metasploit x86 staged reverse TCP
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xFC, 0xE8, 0x82, 0x00, 0x00, 0x00], // CLD; call $+0x82
+            mask: vec![0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00],
+            name: "Metasploit x86 Reverse TCP",
+            confidence: 0.95,
+        });
+
+        // Cobalt Strike beacon
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8, 0xC8, 0x00, 0x00, 0x00],
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00],
+            name: "Cobalt Strike Beacon Prologue",
+            confidence: 0.98,
         });
 
         // Common x64 shellcode prologue
         self.signatures.push(ShellcodeSignature {
-            pattern: vec![0x48, 0x83, 0xEC, 0x00, 0x48, 0x89], // sub rsp, XX; mov
-            mask: vec![0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF],
-            name: "x64 Stack Setup",
-            confidence: 0.6,
+            pattern: vec![0x48, 0x83, 0xEC, 0x28, 0x48, 0x83, 0xE4, 0xF0], // sub rsp, 0x28; and rsp, -16
+            mask: vec![0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "x64 Stack Setup Pattern",
+            confidence: 0.7,
         });
 
-        // Egg hunter pattern (searches for specific marker in memory)
-        self.signatures.push(ShellcodeSignature {
-            pattern: vec![0x66, 0x81, 0x3F], // cmp word ptr [edi], XXXX
-            mask: vec![0xFF, 0xFF, 0xFF],
-            name: "Egg Hunter Pattern",
-            confidence: 0.8,
-        });
+        // ===== Position-Independent Code Patterns =====
 
-        // API hashing pattern (djb2 hash commonly used)
+        // Call-pop technique (get current EIP/RIP)
         self.signatures.push(ShellcodeSignature {
-            pattern: vec![0xC1, 0xCF, 0x0D, 0x01, 0xC7], // ror edi, 0xD; add edi, eax
-            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-            name: "DJB2 Hash Algorithm",
+            pattern: vec![0xE8, 0x00, 0x00, 0x00, 0x00, 0x58], // call $+5; pop eax
+            mask: vec![0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF],
+            name: "Call-Pop GetPC (eax)",
             confidence: 0.9,
         });
 
-        // Common Windows API call pattern
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xE8, 0x00, 0x00, 0x00, 0x00, 0x5B], // call $+5; pop ebx
+            mask: vec![0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF],
+            name: "Call-Pop GetPC (ebx)",
+            confidence: 0.9,
+        });
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xE8, 0x00, 0x00, 0x00, 0x00, 0x5D], // call $+5; pop ebp
+            mask: vec![0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF],
+            name: "Call-Pop GetPC (ebp)",
+            confidence: 0.9,
+        });
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xE8, 0x00, 0x00, 0x00, 0x00, 0x5E], // call $+5; pop esi
+            mask: vec![0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF],
+            name: "Call-Pop GetPC (esi)",
+            confidence: 0.9,
+        });
+
+        // FPU-based GetPC (classic technique)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xD9, 0xEE, 0xD9, 0x74, 0x24, 0xF4], // fldz; fnstenv [esp-12]
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "FPU GetPC Technique",
+            confidence: 0.95,
+        });
+
+        // ===== Egg Hunter Patterns =====
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x66, 0x81, 0xCA, 0xFF, 0x0F], // or dx, 0x0FFF (page alignment)
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Egg Hunter Page Scan",
+            confidence: 0.9,
+        });
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x6A, 0x02, 0x58, 0xCD, 0x2E], // push 2; pop eax; int 0x2E
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Egg Hunter NtAccessCheckAndAuditAlarm",
+            confidence: 0.95,
+        });
+
+        // ===== Windows API Function Resolution =====
+
+        // Walking InMemoryOrderModuleList
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x8B, 0x52, 0x0C, 0x8B, 0x52, 0x14], // mov edx, [edx+0x0C]; mov edx, [edx+0x14]
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "PEB_LDR_DATA Walk (x86)",
+            confidence: 0.92,
+        });
+
+        // x64 LDR walk
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x48, 0x8B, 0x52, 0x18, 0x48, 0x8B, 0x52, 0x20], // mov rdx, [rdx+0x18]; mov rdx, [rdx+0x20]
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "PEB_LDR_DATA Walk (x64)",
+            confidence: 0.92,
+        });
+
+        // ===== Syscall Patterns =====
+
+        // Direct syscall (x64 Windows)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x4C, 0x8B, 0xD1, 0xB8], // mov r10, rcx; mov eax, <syscall_num>
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Direct Syscall Setup (x64)",
+            confidence: 0.9,
+        });
+
+        // int 0x2E syscall (legacy Windows)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xCD, 0x2E], // int 0x2E
+            mask: vec![0xFF, 0xFF],
+            name: "Legacy Syscall (int 0x2E)",
+            confidence: 0.85,
+        });
+
+        // sysenter (x86)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x0F, 0x34], // sysenter
+            mask: vec![0xFF, 0xFF],
+            name: "Sysenter Instruction",
+            confidence: 0.8,
+        });
+
+        // syscall (x64)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x0F, 0x05], // syscall
+            mask: vec![0xFF, 0xFF],
+            name: "Syscall Instruction",
+            confidence: 0.75,
+        });
+
+        // ===== Anti-Analysis Patterns =====
+
+        // IsDebuggerPresent check pattern
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x64, 0x8B, 0x15, 0x30, 0x00, 0x00, 0x00, 0x8B, 0x52, 0x02], // PEB->BeingDebugged
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF],
+            name: "IsDebuggerPresent Check",
+            confidence: 0.85,
+        });
+
+        // ===== Exploit Patterns =====
+
+        // NOP sled detection (various NOP equivalents)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90], // 8 NOPs
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "NOP Sled",
+            confidence: 0.6,
+        });
+
+        // PUSH/RET technique (for control flow hijacking)
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x68], // push imm32
+            mask: vec![0xFF],
+            name: "PUSH/RET Control Flow",
+            confidence: 0.3, // Low confidence as standalone
+        });
+
+        // ===== Process Hollowing/Injection Indicators =====
+
+        // PE header in memory
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x4D, 0x5A, 0x90, 0x00], // MZ header with typical padding
+            mask: vec![0xFF, 0xFF, 0x00, 0x00],
+            name: "PE Header (MZ) in Memory",
+            confidence: 0.7,
+        });
+
+        // PE signature
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x50, 0x45, 0x00, 0x00], // PE\0\0
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF],
+            name: "PE Signature in Memory",
+            confidence: 0.8,
+        });
+
+        // ===== Linux Shellcode Patterns =====
+
+        // Linux x86 execve("/bin/sh")
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x31, 0xC0, 0x50, 0x68, 0x2F, 0x2F, 0x73, 0x68], // xor eax, eax; push eax; push "//sh"
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Linux x86 execve /bin/sh",
+            confidence: 0.98,
+        });
+
+        // Linux x64 execve pattern
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x48, 0x31, 0xD2, 0x48, 0xBB, 0xFF, 0x2F, 0x62, 0x69, 0x6E, 0x2F, 0x73, 0x68], // xor rdx, rdx; mov rbx, "/bin/sh"
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Linux x64 execve /bin/sh",
+            confidence: 0.98,
+        });
+
+        // Linux connect-back pattern
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0x6A, 0x66, 0x58, 0x6A, 0x01, 0x5B], // push 0x66; pop eax; push 1; pop ebx (socketcall)
+            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            name: "Linux socketcall Pattern",
+            confidence: 0.9,
+        });
+
+        // ===== Indirect API Call Patterns =====
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xFF, 0xD0], // call eax
+            mask: vec![0xFF, 0xFF],
+            name: "Indirect Call (eax)",
+            confidence: 0.5,
+        });
+
+        self.signatures.push(ShellcodeSignature {
+            pattern: vec![0xFF, 0xD3], // call ebx
+            mask: vec![0xFF, 0xFF],
+            name: "Indirect Call (ebx)",
+            confidence: 0.5,
+        });
+
         self.signatures.push(ShellcodeSignature {
             pattern: vec![0xFF, 0x15], // call [address]
             mask: vec![0xFF, 0xFF],
             name: "Indirect API Call",
             confidence: 0.4,
-        });
-
-        // NOP sled detection (common in exploits)
-        self.signatures.push(ShellcodeSignature {
-            pattern: vec![0x90, 0x90, 0x90, 0x90, 0x90, 0x90], // Multiple NOPs
-            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-            name: "NOP Sled",
-            confidence: 0.5,
-        });
-
-        // String loading pattern (common in shellcode)
-        self.signatures.push(ShellcodeSignature {
-            pattern: vec![0xE8, 0x00, 0x00, 0x00, 0x00, 0x5E], // call $+5; pop esi
-            mask: vec![0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF],
-            name: "String Loading Technique",
-            confidence: 0.8,
-        });
-
-        // PE header in memory (process hollowing indicator)
-        self.signatures.push(ShellcodeSignature {
-            pattern: vec![0x4D, 0x5A], // MZ header
-            mask: vec![0xFF, 0xFF],
-            name: "PE Header in Memory",
-            confidence: 0.6,
-        });
-
-        // Common metasploit meterpreter pattern
-        self.signatures.push(ShellcodeSignature {
-            pattern: vec![0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8], // CLD; and rsp, -16; call
-            mask: vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-            name: "Meterpreter Payload Pattern",
-            confidence: 0.95,
         });
     }
 

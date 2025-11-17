@@ -46,7 +46,9 @@ Ghost detection engine coverage mapped to MITRE ATT&CK framework techniques.
 - **Indicators**:
   - Unmapped main executable image
   - Suspicious memory gaps (>16MB)
-  - PE header mismatches
+  - PE header validation (DOS/NT signatures)
+  - Image base mismatches
+  - Corrupted PE structures
   - Unusual entry point locations
   - Memory layout anomalies
 - **Confidence**: Very High (0.8-1.0)
@@ -121,35 +123,82 @@ Ghost detection engine coverage mapped to MITRE ATT&CK framework techniques.
 
 | Technique | Detection Module | Implementation Status | Test Coverage |
 |-----------|------------------|----------------------|---------------|
-| T1055.001 | hooks.rs | ✅ Complete | ✅ Tested |
-| T1055.002 | shellcode.rs | ✅ Complete | ✅ Tested |
-| T1055.003 | thread.rs | ✅ Complete | ✅ Tested |
-| T1055.004 | detection.rs | ⚠️ Partial | ✅ Tested |
-| T1055.012 | hollowing.rs | ✅ Complete | ✅ Tested |
-| T1027 | shellcode.rs | ✅ Complete | ✅ Tested |
-| T1036 | process.rs | ⚠️ Partial | ❌ Pending |
-| T1106 | detection.rs | ⚠️ Basic | ❌ Pending |
+| T1055.001 | hooks.rs | ✅ Inline hooks + Linux LD_PRELOAD | ❌ Basic |
+| T1055.002 | shellcode.rs | ⚠️ Heuristic only | ✅ Basic |
+| T1055.003 | thread.rs | ✅ Thread enumeration | ✅ Unit tests |
+| T1055.004 | detection.rs | ⚠️ Heuristic only | ✅ Basic |
+| T1055.012 | hollowing.rs | ✅ PE header validation | ❌ Pending |
+| T1027 | shellcode.rs | ⚠️ Basic patterns | ❌ Pending |
+| T1036 | process.rs | ❌ Not implemented | ❌ Pending |
+| T1106 | detection.rs | ❌ Not implemented | ❌ Pending |
+
+**Implementation Status Legend**:
+- ✅ Complete: Full implementation with actual API calls
+- ⚠️ Partial: Heuristic-based or incomplete implementation
+- ❌ Not implemented: Placeholder or missing
+
+## Current Implementation Details
+
+### What's Actually Implemented
+
+1. **Memory Analysis** (memory.rs)
+   - Windows: VirtualQueryEx, ReadProcessMemory
+   - Linux: /proc/[pid]/maps parsing, /proc/[pid]/mem reading
+   - macOS: Not implemented
+
+2. **Thread Analysis** (thread.rs)
+   - Windows: Thread32First/Next, NtQueryInformationThread, GetThreadTimes
+   - Linux: /proc/[pid]/task enumeration, stat parsing
+   - macOS: Not implemented
+
+3. **Hook Detection** (hooks.rs)
+   - Windows: Inline hook detection via JMP pattern scanning
+   - Linux: LD_PRELOAD detection, LD_LIBRARY_PATH monitoring, ptrace detection
+   - Detects suspicious library loading from /tmp/, /dev/shm/, etc.
+   - Does NOT enumerate SetWindowsHookEx chains on Windows
+   - No IAT/EAT hook scanning (pattern detection only)
+
+4. **Process Hollowing Detection** (hollowing.rs)
+   - Windows: Full PE header validation (DOS/NT signatures, image base)
+   - Detects corrupted PE structures
+   - Detects image base mismatches
+   - Memory layout anomaly detection
+   - Memory gap analysis
+
+5. **Process Enumeration** (process.rs)
+   - Windows: CreateToolhelp32Snapshot
+   - Linux: /proc filesystem
+   - macOS: sysctl KERN_PROC_ALL
+
+### What's NOT Implemented
+
+- Actual shellcode signature database
+- Entropy analysis for obfuscation detection
+- SetWindowsHookEx chain parsing (Windows)
+- APC injection detection
+- MITRE ATT&CK technique attribution (framework only)
+- process_vm_writev monitoring (Linux)
 
 ## Future Enhancements
 
 ### High Priority
 
-- **T1055.008** - Ptrace System Calls (Linux)
-- **T1055.009** - Proc Memory (Linux) 
+- **T1055.008** - Ptrace System Calls (Linux) - ✅ Basic detection implemented
 - **T1055.013** - Process Doppelgänging
 - **T1055.014** - VDSO Hijacking (Linux)
+- Shellcode signature database
 
-### Medium Priority  
+### Medium Priority
 
 - **T1134** - Access Token Manipulation
-- **T1548.002** - Bypass User Account Control
-- **T1562.001** - Disable or Modify Tools
+- SetWindowsHookEx chain enumeration
+- IAT/EAT hook scanning
+- LD_PRELOAD detection (Linux) - ✅ Implemented
 
 ### Research Areas
 
-- Machine learning-based anomaly detection
-- Graph analysis of process relationships
-- Timeline analysis for attack progression
+- Behavioral analysis over time
+- Process relationship analysis
 - Integration with threat intelligence feeds
 
 ## References

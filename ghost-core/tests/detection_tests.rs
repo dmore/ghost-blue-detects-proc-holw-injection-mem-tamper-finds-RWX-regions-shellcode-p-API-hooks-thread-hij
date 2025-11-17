@@ -1,6 +1,11 @@
+//! Integration tests for Ghost detection engine.
+
 #[cfg(test)]
 mod tests {
-    use ghost_core::{DetectionEngine, MemoryProtection, MemoryRegion, ProcessInfo, ThreatLevel};
+    use ghost_core::{
+        config::DetectionConfig, DetectionEngine, MemoryProtection, MemoryRegion, ProcessInfo,
+        ThreatLevel,
+    };
 
     fn create_test_process() -> ProcessInfo {
         ProcessInfo {
@@ -23,7 +28,7 @@ mod tests {
 
     #[test]
     fn test_clean_process_detection() {
-        let mut engine = DetectionEngine::new();
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
         let process = create_test_process();
         let regions = vec![MemoryRegion {
             base_address: 0x400000,
@@ -39,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_rwx_region_detection() {
-        let mut engine = DetectionEngine::new();
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
         let process = create_test_process();
         let regions = vec![create_rwx_region()];
 
@@ -51,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_multiple_small_executable_regions() {
-        let mut engine = DetectionEngine::new();
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
         let process = create_test_process();
         let regions = vec![
             MemoryRegion {
@@ -84,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_baseline_tracking() {
-        let mut engine = DetectionEngine::new();
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
         let mut process = create_test_process();
         let regions = vec![];
 
@@ -99,5 +104,253 @@ mod tests {
             .indicators
             .iter()
             .any(|i| i.contains("new threads")));
+    }
+
+    #[test]
+    fn test_multiple_rwx_regions_high_severity() {
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
+        let process = create_test_process();
+        let regions = vec![
+            MemoryRegion {
+                base_address: 0x10000000,
+                size: 0x1000,
+                protection: MemoryProtection::ReadWriteExecute,
+                region_type: "PRIVATE".to_string(),
+            },
+            MemoryRegion {
+                base_address: 0x20000000,
+                size: 0x2000,
+                protection: MemoryProtection::ReadWriteExecute,
+                region_type: "PRIVATE".to_string(),
+            },
+            MemoryRegion {
+                base_address: 0x30000000,
+                size: 0x3000,
+                protection: MemoryProtection::ReadWriteExecute,
+                region_type: "PRIVATE".to_string(),
+            },
+        ];
+
+        let result = engine.analyze_process(&process, &regions, None);
+        // Multiple RWX regions should be highly suspicious
+        assert_eq!(result.threat_level, ThreatLevel::Malicious);
+        assert!(result.confidence >= 0.5);
+    }
+
+    #[test]
+    fn test_memory_protection_display() {
+        assert_eq!(format!("{}", MemoryProtection::NoAccess), "---");
+        assert_eq!(format!("{}", MemoryProtection::ReadOnly), "R--");
+        assert_eq!(format!("{}", MemoryProtection::ReadWrite), "RW-");
+        assert_eq!(format!("{}", MemoryProtection::ReadExecute), "R-X");
+        assert_eq!(format!("{}", MemoryProtection::ReadWriteExecute), "RWX");
+        assert_eq!(format!("{}", MemoryProtection::Execute), "--X");
+    }
+
+    #[test]
+    fn test_process_info_display() {
+        let process = create_test_process();
+        let display = format!("{}", process);
+        assert!(display.contains("1234"));
+        assert!(display.contains("test.exe"));
+    }
+
+    #[test]
+    fn test_memory_region_display() {
+        let region = create_rwx_region();
+        let display = format!("{}", region);
+        assert!(display.contains("RWX"));
+        assert!(display.contains("PRIVATE"));
+    }
+
+    #[test]
+    fn test_threat_level_ordering() {
+        assert!(ThreatLevel::Clean < ThreatLevel::Suspicious);
+        assert!(ThreatLevel::Suspicious < ThreatLevel::Malicious);
+    }
+
+    #[test]
+    fn test_detection_config_validation() {
+        let config = DetectionConfig::default();
+        assert!(config.validate().is_ok());
+
+        let mut invalid_config = DetectionConfig::default();
+        invalid_config.confidence_threshold = 1.5; // Invalid
+        assert!(invalid_config.validate().is_err());
+
+        invalid_config.confidence_threshold = -0.1; // Invalid
+        assert!(invalid_config.validate().is_err());
+    }
+
+    #[test]
+    fn test_detection_config_presets() {
+        let perf_config = DetectionConfig::performance_mode();
+        let thorough_config = DetectionConfig::thorough_mode();
+
+        // Performance mode should have lower thresholds for faster scanning
+        assert!(perf_config.confidence_threshold <= thorough_config.confidence_threshold);
+    }
+
+    #[test]
+    fn test_process_is_system_process() {
+        let mut process = create_test_process();
+        assert!(!process.is_system_process());
+
+        process.pid = 0;
+        assert!(process.is_system_process());
+
+        process.pid = 4;
+        assert!(process.is_system_process());
+
+        process.pid = 100;
+        process.name = "System".to_string();
+        assert!(process.is_system_process());
+    }
+
+    #[test]
+    fn test_engine_with_custom_config() {
+        let mut config = DetectionConfig::default();
+        config.rwx_detection = false;
+
+        let mut engine = DetectionEngine::with_config(config).expect("Failed to create engine");
+        let process = create_test_process();
+        let regions = vec![create_rwx_region()];
+
+        // With RWX detection disabled, should not flag the region
+        let result = engine.analyze_process(&process, &regions, None);
+        // Might still detect based on other heuristics, but confidence should be lower
+        assert!(result.confidence < 0.5);
+    }
+
+    #[test]
+    fn test_large_memory_region() {
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
+        let process = create_test_process();
+        let regions = vec![MemoryRegion {
+            base_address: 0x10000000,
+            size: 100 * 1024 * 1024, // 100MB region
+            protection: MemoryProtection::ReadWriteExecute,
+            region_type: "PRIVATE".to_string(),
+        }];
+
+        let result = engine.analyze_process(&process, &regions, None);
+        assert_ne!(result.threat_level, ThreatLevel::Clean);
+    }
+
+    #[test]
+    fn test_image_vs_private_region() {
+        let mut engine = DetectionEngine::new().expect("Failed to create engine");
+        let process = create_test_process();
+
+        // IMAGE region with RX is normal
+        let image_regions = vec![MemoryRegion {
+            base_address: 0x400000,
+            size: 0x100000,
+            protection: MemoryProtection::ReadExecute,
+            region_type: "IMAGE".to_string(),
+        }];
+
+        let result = engine.analyze_process(&process, &image_regions, None);
+        assert_eq!(result.threat_level, ThreatLevel::Clean);
+
+        // PRIVATE region with RX is suspicious
+        let private_regions = vec![MemoryRegion {
+            base_address: 0x10000000,
+            size: 0x1000,
+            protection: MemoryProtection::ReadExecute,
+            region_type: "PRIVATE".to_string(),
+        }];
+
+        let result2 = engine.analyze_process(&process, &private_regions, None);
+        // Private executable regions are suspicious but not as severe as RWX
+        assert!(result2.confidence > 0.0 || result2.indicators.len() > 0);
+    }
+}
+
+#[cfg(test)]
+mod mitre_tests {
+    use ghost_core::mitre::{MitreMapping, TechniqueId};
+
+    #[test]
+    fn test_technique_id_display() {
+        let id = TechniqueId::new("T1055", Some("001"));
+        assert_eq!(format!("{}", id), "T1055.001");
+
+        let id_no_sub = TechniqueId::new("T1055", None);
+        assert_eq!(format!("{}", id_no_sub), "T1055");
+    }
+
+    #[test]
+    fn test_mitre_mapping_creation() {
+        let mapping = MitreMapping::default();
+        assert!(mapping.techniques.is_empty());
+    }
+
+    #[test]
+    fn test_technique_lookup() {
+        let mapping = MitreMapping::default();
+        // Default mapping should have no techniques initially
+        assert!(mapping.get_technique("T1055").is_none());
+    }
+}
+
+#[cfg(test)]
+mod threat_intel_tests {
+    use ghost_core::ThreatLevel;
+
+    #[test]
+    fn test_threat_level_description() {
+        assert_eq!(ThreatLevel::Clean.description(), "No threats detected");
+        assert_eq!(
+            ThreatLevel::Suspicious.description(),
+            "Potential security concern"
+        );
+        assert_eq!(
+            ThreatLevel::Malicious.description(),
+            "High confidence malicious activity"
+        );
+    }
+
+    #[test]
+    fn test_threat_level_serialization() {
+        let level = ThreatLevel::Suspicious;
+        let serialized = serde_json::to_string(&level).expect("Failed to serialize");
+        assert!(serialized.contains("Suspicious"));
+
+        let deserialized: ThreatLevel =
+            serde_json::from_str(&serialized).expect("Failed to deserialize");
+        assert_eq!(deserialized, level);
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use ghost_core::config::DetectionConfig;
+
+    #[test]
+    fn test_default_config() {
+        let config = DetectionConfig::default();
+        assert!(config.rwx_detection);
+        assert!(config.shellcode_detection);
+        assert!(config.hollowing_detection);
+        assert!(config.thread_detection);
+        assert!(config.hook_detection);
+    }
+
+    #[test]
+    fn test_config_serialization() {
+        let config = DetectionConfig::default();
+        let json = serde_json::to_string(&config).expect("Failed to serialize");
+        let deserialized: DetectionConfig =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(config.rwx_detection, deserialized.rwx_detection);
+    }
+
+    #[test]
+    fn test_config_toml_format() {
+        let config = DetectionConfig::default();
+        let toml_str = toml::to_string(&config).expect("Failed to serialize to TOML");
+        assert!(toml_str.contains("rwx_detection"));
+        assert!(toml_str.contains("confidence_threshold"));
     }
 }

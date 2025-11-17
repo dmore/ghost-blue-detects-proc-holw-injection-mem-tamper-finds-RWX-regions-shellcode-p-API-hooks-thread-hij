@@ -4,62 +4,64 @@ Cross-platform process injection detection framework written in Rust.
 
 ## Overview
 
-Ghost is a comprehensive security framework for detecting process injection, memory manipulation, and advanced evasion techniques in running processes. It combines kernel-level monitoring with behavioral analysis, machine learning, and threat intelligence to provide enterprise-grade detection capabilities.
+Ghost is a security framework for detecting process injection, memory manipulation, and suspicious process behavior. It provides memory analysis, behavioral monitoring, and MITRE ATT&CK technique mapping for security research and defensive purposes.
 
 ## Features
 
-- **Multi-layer detection**: Memory analysis, behavioral patterns, and ML-based anomaly detection
-- **MITRE ATT&CK mapping**: Automatic technique classification using the ATT&CK framework
-- **Threat intelligence**: Integration with threat feeds for IOC correlation and attribution
-- **Cross-platform**: Windows (full support), Linux (with eBPF), macOS (planned)
-- **Real-time monitoring**: Continuous scanning with configurable intervals
-- **Low overhead**: Performance-optimized for production environments
+- **Memory Analysis**: RWX region detection, shellcode pattern scanning, memory protection analysis
+- **MITRE ATT&CK Mapping**: Technique identification using the ATT&CK framework
+- **Cross-platform Support**:
+  - **Windows**: Process enumeration, memory reading (ReadProcessMemory), thread analysis (NtQueryInformationThread), inline hook detection, PE header validation
+  - **Linux**: Process enumeration via procfs, memory region analysis (/proc/[pid]/maps), thread state monitoring, LD_PRELOAD detection, ptrace detection
+  - **macOS**: Process enumeration via sysctl/KERN_PROC_ALL
+- **Real-time Monitoring**: Continuous scanning with configurable intervals
+- **Threat Intelligence**: IOC storage and correlation framework
 
 ## Architecture
 
 ```
 ghost/
-├── ghost-core/     # Core detection engine (21 modules)
+├── ghost-core/     # Core detection engine and platform abstractions
 ├── ghost-cli/      # Command-line interface
-├── ghost-tui/      # Interactive terminal UI
+├── ghost-tui/      # Interactive terminal UI (Ratatui-based)
 ├── examples/       # Configuration examples
 └── docs/           # Technical documentation
 ```
 
 ### Core Modules
 
-- **Detection Engine**: Orchestrates all analysis components
-- **Memory Analysis**: RWX region detection, shellcode patterns
-- **Process Hollowing**: PE header validation, memory gap analysis
-- **Thread Analysis**: Start address validation, behavioral patterns
-- **Evasion Detection**: Anti-debugging, VM detection, obfuscation
-- **MITRE ATT&CK Engine**: Technique mapping and threat actor profiling
-- **Threat Intelligence**: IOC matching and campaign correlation
+- **Detection Engine** ([detection.rs](ghost-core/src/detection.rs)): Orchestrates analysis and threat scoring
+- **Memory Analysis** ([memory.rs](ghost-core/src/memory.rs)): Platform-specific memory enumeration and reading
+- **Process Enumeration** ([process.rs](ghost-core/src/process.rs)): Cross-platform process listing
+- **Thread Analysis** ([thread.rs](ghost-core/src/thread.rs)): Thread enumeration with start address and creation time
+- **Hook Detection** ([hooks.rs](ghost-core/src/hooks.rs)): Inline hook detection via JMP pattern analysis
+- **MITRE ATT&CK** ([mitre.rs](ghost-core/src/mitre.rs)): Technique mapping and categorization
+- **Configuration** ([config.rs](ghost-core/src/config.rs)): TOML-based configuration with validation
 
 ## Supported Detection Techniques
 
 ### Process Injection (T1055)
 - RWX memory region detection
 - Private executable memory analysis
-- Remote thread creation monitoring
-- SetWindowsHookEx injection (T1055.001)
-- Thread hijacking (T1055.003)
-- APC injection patterns (T1055.004)
-- Process hollowing (T1055.012)
-- Reflective DLL injection
+- Thread count anomaly detection
+- Inline hook detection (JMP patches on ntdll.dll, kernel32.dll, user32.dll)
+- LD_PRELOAD and LD_LIBRARY_PATH detection (Linux)
+- Ptrace injection detection (Linux)
+- SetWindowsHookEx hook enumeration
+- Thread hijacking indicators (T1055.003)
+- Process hollowing detection with PE header validation (T1055.012)
 
-### Evasion Techniques
-- Anti-debugging detection
-- Virtual machine detection attempts
-- Code obfuscation analysis
-- Timing-based analysis evasion
-- Environment fingerprinting
+### Memory Analysis
+- Memory protection flags (R/W/X combinations)
+- Region type classification (IMAGE, PRIVATE, MAPPED, HEAP, STACK)
+- Small executable region detection (shellcode indicators)
+- Memory region size anomalies
 
-### Behavioral Anomalies
-- Thread count deviations
-- Memory allocation patterns
-- API call sequences
-- Process relationship analysis
+### Behavioral Monitoring
+- Thread count changes from baseline
+- New thread creation detection
+- Process parent-child relationships
+- System process identification
 
 ## Installation
 
@@ -192,6 +194,27 @@ Please review [SECURITY.md](SECURITY.md) for:
 - Security considerations
 - Threat model
 
+## Platform Support Matrix
+
+| Feature | Windows | Linux | macOS |
+|---------|---------|-------|-------|
+| Process Enumeration | CreateToolhelp32Snapshot | /proc filesystem | sysctl KERN_PROC_ALL |
+| Memory Enumeration | VirtualQueryEx | /proc/[pid]/maps | Not implemented |
+| Memory Reading | ReadProcessMemory | /proc/[pid]/mem | Not implemented |
+| Thread Enumeration | Thread32First/Next | /proc/[pid]/task | Not implemented |
+| Thread Start Address | NtQueryInformationThread | /proc/[pid]/task/[tid]/syscall | Not implemented |
+| Thread Creation Time | GetThreadTimes | /proc/[pid]/task/[tid]/stat | Not implemented |
+| Hook Detection | Inline JMP pattern scanning | LD_PRELOAD/ptrace detection | Not applicable |
+| PE Header Validation | Full PE validation | Not applicable | Not applicable |
+| Process Path | GetProcessImageFileNameW | /proc/[pid]/exe | proc_pidpath |
+
 ## Status
 
-Active development. Core detection engine stable. Windows support complete. Linux eBPF support in progress. macOS Endpoint Security framework planned.
+Active development. Core detection engine functional with cross-platform abstractions. Windows support most complete. Linux support via procfs. macOS has process enumeration but limited memory/thread analysis.
+
+### Known Limitations
+
+- macOS memory enumeration and reading not yet implemented (requires vm_read and mach_vm_region)
+- Windows SetWindowsHookEx chain enumeration requires parsing undocumented USER32.dll structures
+- Shellcode pattern matching currently uses heuristics (no actual signature database)
+- No kernel-level monitoring (all userspace APIs)

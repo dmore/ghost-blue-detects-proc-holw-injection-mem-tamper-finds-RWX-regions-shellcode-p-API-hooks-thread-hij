@@ -46,10 +46,36 @@ Monitors thread count changes over time. Sudden increases may indicate CreateRem
 
 Threads created by external processes via CreateRemoteThread or NtCreateThreadEx.
 
-**Detection Logic** (Planned):
-- Compare thread creator PID with owner PID
-- Check thread start addresses against known modules
+**Detection Logic**:
+- Enumerate threads using CreateToolhelp32Snapshot (Windows) or /proc/[pid]/task (Linux)
+- Get thread start addresses via NtQueryInformationThread (Windows) or /proc syscall file (Linux)
+- Get thread creation times via GetThreadTimes (Windows) or stat parsing (Linux)
+- Track thread state (Running, Waiting, Suspended, Terminated)
 - Flag threads starting in private memory regions
+
+## Hook Detection
+
+### Inline API Hooks
+
+**MITRE ATT&CK**: T1055.003
+
+Detects JMP patches at the start of critical API functions.
+
+**Detection Logic**:
+- Enumerate loaded modules in target process (EnumProcessModulesEx)
+- Check entry points of critical APIs (ntdll, kernel32, user32)
+- Detect common hook patterns:
+  - JMP rel32 (E9 xx xx xx xx)
+  - JMP [rip+disp32] (FF 25 xx xx xx xx)
+  - MOV RAX, imm64; JMP RAX (48 B8 ... FF E0)
+  - PUSH imm32; RET (68 xx xx xx xx C3)
+
+**Critical APIs Monitored**:
+- NtCreateThread, NtCreateThreadEx
+- NtAllocateVirtualMemory, NtWriteVirtualMemory, NtProtectVirtualMemory
+- VirtualAllocEx, WriteProcessMemory, CreateRemoteThread
+- LoadLibraryA, LoadLibraryW
+- SetWindowsHookExA, SetWindowsHookExW
 
 ## Heuristic Analysis
 
@@ -74,23 +100,37 @@ Ghost uses weighted confidence scoring:
 ### Windows
 
 - [x] Classic DLL injection detection
-- [x] Memory region analysis
-- [x] Thread enumeration
+- [x] Memory region analysis (VirtualQueryEx)
+- [x] Memory reading (ReadProcessMemory)
+- [x] Thread enumeration (CreateToolhelp32Snapshot)
+- [x] Thread start addresses (NtQueryInformationThread)
+- [x] Thread creation times (GetThreadTimes)
+- [x] Inline hook detection (JMP pattern scanning)
+- [x] Process hollowing heuristics
 - [ ] APC injection detection
-- [ ] Process hollowing detection
-- [ ] Hook detection (IAT/EAT)
-- [ ] Reflective DLL injection
+- [ ] SetWindowsHookEx chain enumeration
+- [ ] Reflective DLL injection signature matching
 
 ### Linux
 
-- [ ] ptrace injection
-- [ ] LD_PRELOAD detection
+- [x] Process enumeration (/proc filesystem)
+- [x] Memory region analysis (/proc/[pid]/maps)
+- [x] Memory reading (/proc/[pid]/mem)
+- [x] Thread enumeration (/proc/[pid]/task)
+- [x] Thread state detection (stat parsing)
+- [x] ptrace injection detection
+- [x] LD_PRELOAD detection
 - [ ] process_vm_writev monitoring
 - [ ] Shared memory inspection
 
 ### macOS
 
-- [ ] DYLD_INSERT_LIBRARIES
+- [x] Process enumeration (sysctl KERN_PROC_ALL)
+- [x] Process path retrieval (proc_pidpath)
+- [ ] Memory enumeration (vm_region)
+- [ ] Memory reading (vm_read)
+- [ ] Thread enumeration (task_threads)
+- [ ] DYLD_INSERT_LIBRARIES detection
 - [ ] task_for_pid monitoring
 - [ ] Mach port analysis
 

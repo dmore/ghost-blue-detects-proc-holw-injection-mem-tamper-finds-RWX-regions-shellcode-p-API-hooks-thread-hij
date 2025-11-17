@@ -1,6 +1,120 @@
+//! Memory region enumeration and analysis.
+//!
+//! This module provides cross-platform memory introspection capabilities,
+//! allowing analysis of process memory layouts, protection flags, and content.
+
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// PE header constants
+#[cfg(windows)]
+pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D; // "MZ"
+#[cfg(windows)]
+pub const IMAGE_NT_SIGNATURE: u32 = 0x00004550; // "PE\0\0"
+
+/// DOS header structure (first 64 bytes of a PE file)
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct ImageDosHeader {
+    pub e_magic: u16,      // Magic number ("MZ")
+    pub e_cblp: u16,       // Bytes on last page
+    pub e_cp: u16,         // Pages in file
+    pub e_crlc: u16,       // Relocations
+    pub e_cparhdr: u16,    // Size of header in paragraphs
+    pub e_minalloc: u16,   // Minimum extra paragraphs
+    pub e_maxalloc: u16,   // Maximum extra paragraphs
+    pub e_ss: u16,         // Initial SS value
+    pub e_sp: u16,         // Initial SP value
+    pub e_csum: u16,       // Checksum
+    pub e_ip: u16,         // Initial IP value
+    pub e_cs: u16,         // Initial CS value
+    pub e_lfarlc: u16,     // File address of relocation table
+    pub e_ovno: u16,       // Overlay number
+    pub e_res: [u16; 4],   // Reserved
+    pub e_oemid: u16,      // OEM identifier
+    pub e_oeminfo: u16,    // OEM information
+    pub e_res2: [u16; 10], // Reserved
+    pub e_lfanew: i32,     // File address of new exe header
+}
+
+/// PE file header structure
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct ImageFileHeader {
+    pub machine: u16,
+    pub number_of_sections: u16,
+    pub time_date_stamp: u32,
+    pub pointer_to_symbol_table: u32,
+    pub number_of_symbols: u32,
+    pub size_of_optional_header: u16,
+    pub characteristics: u16,
+}
+
+/// PE optional header structure (64-bit)
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct ImageOptionalHeader64 {
+    pub magic: u16,
+    pub major_linker_version: u8,
+    pub minor_linker_version: u8,
+    pub size_of_code: u32,
+    pub size_of_initialized_data: u32,
+    pub size_of_uninitialized_data: u32,
+    pub address_of_entry_point: u32,
+    pub base_of_code: u32,
+    pub image_base: u64,
+    pub section_alignment: u32,
+    pub file_alignment: u32,
+    pub major_operating_system_version: u16,
+    pub minor_operating_system_version: u16,
+    pub major_image_version: u16,
+    pub minor_image_version: u16,
+    pub major_subsystem_version: u16,
+    pub minor_subsystem_version: u16,
+    pub win32_version_value: u32,
+    pub size_of_image: u32,
+    pub size_of_headers: u32,
+    pub check_sum: u32,
+    pub subsystem: u16,
+    pub dll_characteristics: u16,
+    pub size_of_stack_reserve: u64,
+    pub size_of_stack_commit: u64,
+    pub size_of_heap_reserve: u64,
+    pub size_of_heap_commit: u64,
+    pub loader_flags: u32,
+    pub number_of_rva_and_sizes: u32,
+}
+
+/// PE header validation result
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PEHeaderValidation {
+    Valid,
+    InvalidDosSignature,
+    InvalidNtSignature,
+    InvalidHeaderOffset,
+    MismatchedImageBase,
+    SuspiciousEntryPoint,
+    CorruptedHeader,
+    NotPE,
+}
+
+impl fmt::Display for PEHeaderValidation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Valid => write!(f, "Valid PE header"),
+            Self::InvalidDosSignature => write!(f, "Invalid DOS signature"),
+            Self::InvalidNtSignature => write!(f, "Invalid NT signature"),
+            Self::InvalidHeaderOffset => write!(f, "Invalid header offset"),
+            Self::MismatchedImageBase => write!(f, "Image base mismatch"),
+            Self::SuspiciousEntryPoint => write!(f, "Suspicious entry point"),
+            Self::CorruptedHeader => write!(f, "Corrupted PE header"),
+            Self::NotPE => write!(f, "Not a PE file"),
+        }
+    }
+}
+
+/// Memory protection flags for a memory region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemoryProtection {
     NoAccess,
     ReadOnly,
@@ -28,11 +142,16 @@ impl fmt::Display for MemoryProtection {
     }
 }
 
-#[derive(Debug, Clone)]
+/// Information about a memory region within a process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryRegion {
+    /// Base address of the memory region.
     pub base_address: usize,
+    /// Size of the region in bytes.
     pub size: usize,
+    /// Memory protection flags.
     pub protection: MemoryProtection,
+    /// Type of memory region (IMAGE, MAPPED, PRIVATE, etc.).
     pub region_type: String,
 }
 
@@ -49,18 +168,217 @@ impl fmt::Display for MemoryRegion {
     }
 }
 
+/// Validates a PE header in process memory
+#[cfg(windows)]
+pub fn validate_pe_header(pid: u32, base_address: usize) -> anyhow::Result<PEHeaderValidation> {
+    use std::mem;
+
+    // Read DOS header
+    let dos_header_size = mem::size_of::<ImageDosHeader>();
+    let dos_header_bytes = read_process_memory(pid, base_address, dos_header_size)?;
+    
+    if dos_header_bytes.len() < dos_header_size {
+        return Ok(PEHeaderValidation::CorruptedHeader);
+    }
+
+    let dos_header = unsafe {
+        std::ptr::read(dos_header_bytes.as_ptr() as *const ImageDosHeader)
+    };
+
+    // Validate DOS signature
+    if dos_header.e_magic != IMAGE_DOS_SIGNATURE {
+        return Ok(PEHeaderValidation::InvalidDosSignature);
+    }
+
+    // Validate e_lfanew offset (should be reasonable)
+    if dos_header.e_lfanew < 0 || dos_header.e_lfanew > 0x1000 {
+        return Ok(PEHeaderValidation::InvalidHeaderOffset);
+    }
+
+    // Read NT headers
+    let nt_header_address = base_address.wrapping_add(dos_header.e_lfanew as usize);
+    
+    // Read NT signature (4 bytes)
+    let nt_sig_bytes = read_process_memory(pid, nt_header_address, 4)?;
+    if nt_sig_bytes.len() < 4 {
+        return Ok(PEHeaderValidation::CorruptedHeader);
+    }
+
+    let nt_signature = u32::from_le_bytes([
+        nt_sig_bytes[0],
+        nt_sig_bytes[1],
+        nt_sig_bytes[2],
+        nt_sig_bytes[3],
+    ]);
+
+    if nt_signature != IMAGE_NT_SIGNATURE {
+        return Ok(PEHeaderValidation::InvalidNtSignature);
+    }
+
+    // Read file header
+    let file_header_address = nt_header_address + 4;
+    let file_header_size = mem::size_of::<ImageFileHeader>();
+    let file_header_bytes = read_process_memory(pid, file_header_address, file_header_size)?;
+    
+    if file_header_bytes.len() < file_header_size {
+        return Ok(PEHeaderValidation::CorruptedHeader);
+    }
+
+    let file_header = unsafe {
+        std::ptr::read(file_header_bytes.as_ptr() as *const ImageFileHeader)
+    };
+
+    // Read optional header (64-bit)
+    let optional_header_address = file_header_address + file_header_size;
+    let optional_header_size = mem::size_of::<ImageOptionalHeader64>();
+    let optional_header_bytes = read_process_memory(pid, optional_header_address, optional_header_size)?;
+    
+    if optional_header_bytes.len() < optional_header_size {
+        return Ok(PEHeaderValidation::CorruptedHeader);
+    }
+
+    let optional_header = unsafe {
+        std::ptr::read(optional_header_bytes.as_ptr() as *const ImageOptionalHeader64)
+    };
+
+    // Validate image base matches memory address
+    if optional_header.image_base != base_address as u64 {
+        return Ok(PEHeaderValidation::MismatchedImageBase);
+    }
+
+    // Validate entry point (should be within the image)
+    let entry_point_rva = optional_header.address_of_entry_point;
+    if entry_point_rva == 0 || entry_point_rva >= optional_header.size_of_image {
+        return Ok(PEHeaderValidation::SuspiciousEntryPoint);
+    }
+
+    // Additional validation: check if sections count is reasonable
+    if file_header.number_of_sections > 96 {
+        return Ok(PEHeaderValidation::CorruptedHeader);
+    }
+
+    Ok(PEHeaderValidation::Valid)
+}
+
+/// Stub for non-Windows platforms
+#[cfg(not(windows))]
+pub fn validate_pe_header(_pid: u32, _base_address: usize) -> anyhow::Result<PEHeaderValidation> {
+    Ok(PEHeaderValidation::NotPE)
+}
+
+/// Gets PE header information from process memory
+#[cfg(windows)]
+pub fn read_pe_header_info(pid: u32, base_address: usize) -> anyhow::Result<Option<PEHeaderInfo>> {
+    use std::mem;
+
+    let dos_header_size = mem::size_of::<ImageDosHeader>();
+    let dos_header_bytes = read_process_memory(pid, base_address, dos_header_size)?;
+    
+    if dos_header_bytes.len() < dos_header_size {
+        return Ok(None);
+    }
+
+    let dos_header = unsafe {
+        std::ptr::read(dos_header_bytes.as_ptr() as *const ImageDosHeader)
+    };
+
+    if dos_header.e_magic != IMAGE_DOS_SIGNATURE {
+        return Ok(None);
+    }
+
+    if dos_header.e_lfanew < 0 || dos_header.e_lfanew > 0x1000 {
+        return Ok(None);
+    }
+
+    let nt_header_address = base_address.wrapping_add(dos_header.e_lfanew as usize);
+    
+    // Read NT signature
+    let nt_sig_bytes = read_process_memory(pid, nt_header_address, 4)?;
+    if nt_sig_bytes.len() < 4 {
+        return Ok(None);
+    }
+
+    let nt_signature = u32::from_le_bytes([
+        nt_sig_bytes[0],
+        nt_sig_bytes[1],
+        nt_sig_bytes[2],
+        nt_sig_bytes[3],
+    ]);
+
+    if nt_signature != IMAGE_NT_SIGNATURE {
+        return Ok(None);
+    }
+
+    // Read file header
+    let file_header_address = nt_header_address + 4;
+    let file_header_size = mem::size_of::<ImageFileHeader>();
+    let file_header_bytes = read_process_memory(pid, file_header_address, file_header_size)?;
+    
+    if file_header_bytes.len() < file_header_size {
+        return Ok(None);
+    }
+
+    let file_header = unsafe {
+        std::ptr::read(file_header_bytes.as_ptr() as *const ImageFileHeader)
+    };
+
+    // Read optional header
+    let optional_header_address = file_header_address + file_header_size;
+    let optional_header_size = mem::size_of::<ImageOptionalHeader64>();
+    let optional_header_bytes = read_process_memory(pid, optional_header_address, optional_header_size)?;
+    
+    if optional_header_bytes.len() < optional_header_size {
+        return Ok(None);
+    }
+
+    let optional_header = unsafe {
+        std::ptr::read(optional_header_bytes.as_ptr() as *const ImageOptionalHeader64)
+    };
+
+    Ok(Some(PEHeaderInfo {
+        dos_signature: dos_header.e_magic,
+        nt_signature,
+        machine: file_header.machine,
+        number_of_sections: file_header.number_of_sections,
+        image_base: optional_header.image_base,
+        entry_point_rva: optional_header.address_of_entry_point,
+        size_of_image: optional_header.size_of_image,
+        size_of_headers: optional_header.size_of_headers,
+    }))
+}
+
+/// PE header information extracted from process memory
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PEHeaderInfo {
+    pub dos_signature: u16,
+    pub nt_signature: u32,
+    pub machine: u16,
+    pub number_of_sections: u16,
+    pub image_base: u64,
+    pub entry_point_rva: u32,
+    pub size_of_image: u32,
+    pub size_of_headers: u32,
+}
+
+#[cfg(not(windows))]
+pub fn read_pe_header_info(_pid: u32, _base_address: usize) -> anyhow::Result<Option<PEHeaderInfo>> {
+    Ok(None)
+}
+
 #[cfg(windows)]
 mod platform {
     use super::{MemoryProtection, MemoryRegion};
     use anyhow::{Context, Result};
-    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
     use windows::Win32::System::Memory::{
-        VirtualQueryEx, MEMORY_BASIC_INFORMATION, MEM_COMMIT, MEM_FREE, MEM_IMAGE, MEM_MAPPED,
-        MEM_PRIVATE, MEM_RESERVE, PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE,
-        PAGE_EXECUTE_WRITECOPY, PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY,
+        VirtualQueryEx, MEMORY_BASIC_INFORMATION, MEM_COMMIT, MEM_IMAGE, MEM_MAPPED, MEM_PRIVATE,
+        PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY,
+        PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_WRITECOPY,
     };
-    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+    use windows::Win32::System::Threading::{
+        OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+    };
 
     fn parse_protection(protect: u32) -> MemoryProtection {
         match protect & 0xFF {
@@ -80,7 +398,6 @@ mod platform {
     pub fn enumerate_memory_regions(pid: u32) -> Result<Vec<MemoryRegion>> {
         let mut regions = Vec::new();
 
-        // Skip system process 
         if pid == 0 || pid == 4 {
             return Ok(regions);
         }
@@ -108,7 +425,7 @@ mod platform {
                     let region_type = if mbi.Type == MEM_IMAGE {
                         "IMAGE"
                     } else if mbi.Type == MEM_MAPPED {
-                        "MAPPED" 
+                        "MAPPED"
                     } else if mbi.Type == MEM_PRIVATE {
                         "PRIVATE"
                     } else {
@@ -138,19 +455,358 @@ mod platform {
 
         Ok(regions)
     }
+
+    /// Reads memory from a process at the specified address.
+    ///
+    /// # Safety
+    ///
+    /// This function reads arbitrary process memory. The caller must ensure
+    /// the address and size are valid for the target process.
+    pub fn read_process_memory(pid: u32, address: usize, size: usize) -> Result<Vec<u8>> {
+        if pid == 0 || pid == 4 {
+            return Err(anyhow::anyhow!("Cannot read system process memory"));
+        }
+
+        unsafe {
+            let handle = OpenProcess(PROCESS_VM_READ, false, pid)
+                .context("Failed to open process for memory read")?;
+
+            let mut buffer = vec![0u8; size];
+            let mut bytes_read = 0usize;
+
+            let success = ReadProcessMemory(
+                handle,
+                address as *const _,
+                buffer.as_mut_ptr() as *mut _,
+                size,
+                Some(&mut bytes_read),
+            );
+
+            let _ = CloseHandle(handle);
+
+            if success.is_ok() && bytes_read > 0 {
+                buffer.truncate(bytes_read);
+                Ok(buffer)
+            } else {
+                Err(anyhow::anyhow!(
+                    "Failed to read process memory at {:#x}",
+                    address
+                ))
+            }
+        }
+    }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+mod platform {
+    use super::{MemoryProtection, MemoryRegion};
+    use anyhow::{Context, Result};
+    use std::fs;
+
+    pub fn enumerate_memory_regions(pid: u32) -> Result<Vec<MemoryRegion>> {
+        let maps_path = format!("/proc/{}/maps", pid);
+        let content = fs::read_to_string(&maps_path)
+            .context(format!("Failed to read {}", maps_path))?;
+
+        let mut regions = Vec::new();
+
+        for line in content.lines() {
+            if let Some(region) = parse_maps_line(line) {
+                regions.push(region);
+            }
+        }
+
+        Ok(regions)
+    }
+
+    fn parse_maps_line(line: &str) -> Option<MemoryRegion> {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        let addr_range = parts[0];
+        let perms = parts.get(1)?;
+        let pathname = parts.get(5..).map(|p| p.join(" ")).unwrap_or_default();
+
+        let (start, end) = {
+            let mut split = addr_range.split('-');
+            let start = usize::from_str_radix(split.next()?, 16).ok()?;
+            let end = usize::from_str_radix(split.next()?, 16).ok()?;
+            (start, end)
+        };
+
+        let protection = parse_linux_perms(perms);
+        let region_type = determine_region_type(&pathname);
+
+        Some(MemoryRegion {
+            base_address: start,
+            size: end.saturating_sub(start),
+            protection,
+            region_type,
+        })
+    }
+
+    fn parse_linux_perms(perms: &str) -> MemoryProtection {
+        let r = perms.contains('r');
+        let w = perms.contains('w');
+        let x = perms.contains('x');
+
+        match (r, w, x) {
+            (false, false, false) => MemoryProtection::NoAccess,
+            (true, false, false) => MemoryProtection::ReadOnly,
+            (true, true, false) => MemoryProtection::ReadWrite,
+            (true, false, true) => MemoryProtection::ReadExecute,
+            (true, true, true) => MemoryProtection::ReadWriteExecute,
+            (false, false, true) => MemoryProtection::Execute,
+            _ => MemoryProtection::Unknown,
+        }
+    }
+
+    fn determine_region_type(pathname: &str) -> String {
+        if pathname.is_empty() || pathname == "[anon]" {
+            "PRIVATE".to_string()
+        } else if pathname.starts_with('[') {
+            match pathname {
+                "[heap]" => "HEAP".to_string(),
+                "[stack]" => "STACK".to_string(),
+                "[vdso]" | "[vvar]" | "[vsyscall]" => "SYSTEM".to_string(),
+                _ => "SPECIAL".to_string(),
+            }
+        } else if pathname.ends_with(".so") || pathname.contains(".so.") {
+            "IMAGE".to_string()
+        } else {
+            "MAPPED".to_string()
+        }
+    }
+
+    pub fn read_process_memory(pid: u32, address: usize, size: usize) -> Result<Vec<u8>> {
+        let mem_path = format!("/proc/{}/mem", pid);
+        let mut file = fs::File::open(&mem_path)
+            .context(format!("Failed to open {}", mem_path))?;
+
+        use std::io::{Read, Seek, SeekFrom};
+        file.seek(SeekFrom::Start(address as u64))
+            .context("Failed to seek to memory address")?;
+
+        let mut buffer = vec![0u8; size];
+        let bytes_read = file.read(&mut buffer).context("Failed to read memory")?;
+        buffer.truncate(bytes_read);
+
+        Ok(buffer)
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod platform {
+    use super::{MemoryProtection, MemoryRegion};
+    use anyhow::{Context, Result};
+
+    pub fn enumerate_memory_regions(pid: u32) -> Result<Vec<MemoryRegion>> {
+        use libc::{
+            mach_port_t, mach_vm_address_t, mach_vm_size_t, natural_t, vm_region_basic_info_64,
+            VM_REGION_BASIC_INFO_64,
+        };
+        use std::mem;
+
+        extern "C" {
+            fn task_for_pid(
+                target_tport: mach_port_t,
+                pid: i32,
+                task: *mut mach_port_t,
+            ) -> i32;
+            fn mach_task_self() -> mach_port_t;
+            fn mach_vm_region(
+                target_task: mach_port_t,
+                address: *mut mach_vm_address_t,
+                size: *mut mach_vm_size_t,
+                flavor: i32,
+                info: *mut i32,
+                info_count: *mut u32,
+                object_name: *mut mach_port_t,
+            ) -> i32;
+        }
+
+        let mut regions = Vec::new();
+
+        unsafe {
+            let mut task: mach_port_t = 0;
+            let kr = task_for_pid(mach_task_self(), pid as i32, &mut task);
+
+            if kr != 0 {
+                // KERN_SUCCESS = 0
+                return Err(anyhow::anyhow!(
+                    "task_for_pid failed with error code {}. Requires root or taskgated entitlement.",
+                    kr
+                ));
+            }
+
+            let mut address: mach_vm_address_t = 0;
+
+            loop {
+                let mut size: mach_vm_size_t = 0;
+                let mut info: vm_region_basic_info_64 = mem::zeroed();
+                let mut info_count = (mem::size_of::<vm_region_basic_info_64>()
+                    / mem::size_of::<natural_t>()) as u32;
+                let mut object_name: mach_port_t = 0;
+
+                let kr = mach_vm_region(
+                    task,
+                    &mut address,
+                    &mut size,
+                    VM_REGION_BASIC_INFO_64,
+                    &mut info as *mut _ as *mut i32,
+                    &mut info_count,
+                    &mut object_name,
+                );
+
+                if kr != 0 {
+                    // End of address space or error
+                    break;
+                }
+
+                let protection = parse_mach_protection(info.protection);
+                let region_type = determine_mach_region_type(&info);
+
+                regions.push(MemoryRegion {
+                    base_address: address as usize,
+                    size: size as usize,
+                    protection,
+                    region_type,
+                });
+
+                // Move to next region
+                address = address.saturating_add(size);
+                if address == 0 {
+                    break;
+                }
+            }
+        }
+
+        Ok(regions)
+    }
+
+    fn parse_mach_protection(prot: i32) -> MemoryProtection {
+        // VM_PROT_READ = 1, VM_PROT_WRITE = 2, VM_PROT_EXECUTE = 4
+        let r = (prot & 1) != 0;
+        let w = (prot & 2) != 0;
+        let x = (prot & 4) != 0;
+
+        match (r, w, x) {
+            (false, false, false) => MemoryProtection::NoAccess,
+            (true, false, false) => MemoryProtection::ReadOnly,
+            (true, true, false) => MemoryProtection::ReadWrite,
+            (true, false, true) => MemoryProtection::ReadExecute,
+            (true, true, true) => MemoryProtection::ReadWriteExecute,
+            (false, false, true) => MemoryProtection::Execute,
+            _ => MemoryProtection::Unknown,
+        }
+    }
+
+    fn determine_mach_region_type(info: &libc::vm_region_basic_info_64) -> String {
+        // Determine region type based on characteristics
+        if info.shared != 0 {
+            "SHARED".to_string()
+        } else if info.reserved != 0 {
+            "RESERVED".to_string()
+        } else {
+            "PRIVATE".to_string()
+        }
+    }
+
+    pub fn read_process_memory(pid: u32, address: usize, size: usize) -> Result<Vec<u8>> {
+        use libc::mach_port_t;
+
+        extern "C" {
+            fn task_for_pid(
+                target_tport: mach_port_t,
+                pid: i32,
+                task: *mut mach_port_t,
+            ) -> i32;
+            fn mach_task_self() -> mach_port_t;
+            fn mach_vm_read_overwrite(
+                target_task: mach_port_t,
+                address: u64,
+                size: u64,
+                data: u64,
+                out_size: *mut u64,
+            ) -> i32;
+        }
+
+        unsafe {
+            let mut task: mach_port_t = 0;
+            let kr = task_for_pid(mach_task_self(), pid as i32, &mut task);
+
+            if kr != 0 {
+                return Err(anyhow::anyhow!(
+                    "task_for_pid failed with error code {}",
+                    kr
+                ));
+            }
+
+            let mut buffer = vec![0u8; size];
+            let mut out_size: u64 = 0;
+
+            let kr = mach_vm_read_overwrite(
+                task,
+                address as u64,
+                size as u64,
+                buffer.as_mut_ptr() as u64,
+                &mut out_size,
+            );
+
+            if kr != 0 {
+                return Err(anyhow::anyhow!(
+                    "mach_vm_read_overwrite failed with error code {}",
+                    kr
+                ));
+            }
+
+            buffer.truncate(out_size as usize);
+            Ok(buffer)
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod platform {
     use super::MemoryRegion;
     use anyhow::Result;
 
     pub fn enumerate_memory_regions(_pid: u32) -> Result<Vec<MemoryRegion>> {
-        // TODO: Implement Linux/macOS memory enumeration
-        Ok(Vec::new())
+        Err(anyhow::anyhow!(
+            "Memory enumeration not supported on this platform"
+        ))
+    }
+
+    pub fn read_process_memory(_pid: u32, _address: usize, _size: usize) -> Result<Vec<u8>> {
+        Err(anyhow::anyhow!(
+            "Memory reading not supported on this platform"
+        ))
     }
 }
 
+/// Enumerates all memory regions for a process.
+///
+/// # Platform Support
+///
+/// - **Windows**: Uses VirtualQueryEx to enumerate regions.
+/// - **Linux**: Parses /proc/[pid]/maps.
+/// - **macOS**: Not yet implemented.
 pub fn enumerate_memory_regions(pid: u32) -> anyhow::Result<Vec<MemoryRegion>> {
     platform::enumerate_memory_regions(pid)
+}
+
+/// Reads raw memory content from a process.
+///
+/// This function reads up to `size` bytes from the target process at the
+/// specified address. Requires appropriate privileges.
+///
+/// # Platform Support
+///
+/// - **Windows**: Uses ReadProcessMemory API.
+/// - **Linux**: Reads from /proc/[pid]/mem.
+/// - **macOS**: Not yet implemented.
+pub fn read_process_memory(pid: u32, address: usize, size: usize) -> anyhow::Result<Vec<u8>> {
+    platform::read_process_memory(pid, address, size)
 }

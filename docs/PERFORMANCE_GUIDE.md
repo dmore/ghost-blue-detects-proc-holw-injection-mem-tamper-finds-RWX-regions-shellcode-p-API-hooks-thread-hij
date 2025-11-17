@@ -2,298 +2,197 @@
 
 ## Overview
 
-Ghost is designed for high-performance real-time detection with minimal system impact. This guide covers optimization strategies and performance monitoring.
+Ghost is designed for process injection detection with configurable performance characteristics. This guide covers actual optimization strategies and expected performance.
 
 ## Performance Characteristics
 
-### Detection Engine Performance
+### Expected Detection Engine Performance
 
-- **Scan Speed**: 500-1000 processes/second on modern hardware
-- **Memory Usage**: 50-100MB base footprint
-- **CPU Impact**: <2% during active monitoring
-- **Latency**: <10ms detection response time
+- **Process Enumeration**: 10-50ms for all system processes
+- **Memory Region Analysis**: 1-5ms per process (platform-dependent)
+- **Thread Enumeration**: 1-10ms per process
+- **Detection Heuristics**: <1ms per process
+- **Memory Usage**: ~10-20MB for core engine
 
-### Optimization Techniques
+**Note**: Actual performance varies significantly by:
+- Number of processes (100-1000+ typical)
+- Memory region count per process
+- Thread count per process
+- Platform (Windows APIs vs Linux procfs)
 
-#### 1. Selective Scanning
+### Configuration Options
 
-```rust
-// Configure detection modules based on threat landscape
-let mut config = DetectionConfig::new();
-config.enable_shellcode_detection(true);
-config.enable_hook_detection(false); // Disable if not needed
-config.enable_anomaly_detection(true);
-```
-
-#### 2. Batch Processing
+#### 1. Selective Detection
 
 ```rust
-// Process multiple items in batches for efficiency
-let processes = enumerate_processes()?;
-let results: Vec<DetectionResult> = processes
-    .chunks(10)
-    .flat_map(|chunk| engine.analyze_batch(chunk))
-    .collect();
+use ghost_core::config::DetectionConfig;
+
+// Disable expensive detections for performance
+let mut config = DetectionConfig::default();
+config.rwx_detection = true;      // Fast: O(n) memory regions
+config.shellcode_detection = false; // Skip pattern matching
+config.hook_detection = false;    // Skip module enumeration
+config.thread_detection = true;   // Moderate: thread enum
+config.hollowing_detection = false; // Skip heuristics
 ```
 
-#### 3. Memory Pool Management
+#### 2. Preset Modes
 
 ```rust
-// Pre-allocate memory pools to reduce allocations
-pub struct MemoryPool {
-    process_buffers: Vec<ProcessBuffer>,
-    detection_results: Vec<DetectionResult>,
-}
+// Fast scanning mode
+let config = DetectionConfig::performance_mode();
+
+// Thorough scanning mode
+let config = DetectionConfig::thorough_mode();
 ```
 
-## Performance Monitoring
-
-### Built-in Metrics
+#### 3. Process Filtering
 
 ```rust
-use ghost_core::metrics::PerformanceMonitor;
+// Skip system processes
+config.skip_system_processes = true;
 
-let monitor = PerformanceMonitor::new();
-monitor.start_collection();
-
-// Detection operations...
-
-let stats = monitor.get_statistics();
-println!("Avg scan time: {:.2}ms", stats.avg_scan_time);
-println!("Memory usage: {}MB", stats.memory_usage_mb);
+// Limit memory scan size
+config.max_memory_scan_size = 10 * 1024 * 1024; // 10MB per process
 ```
 
-### Custom Benchmarks
+## Performance Considerations
+
+### Platform-Specific Performance
+
+**Windows**:
+- CreateToolhelp32Snapshot: Single syscall, fast
+- VirtualQueryEx: Iterative, slower for processes with many regions
+- ReadProcessMemory: Cross-process, requires proper handles
+- NtQueryInformationThread: Undocumented API call per thread
+
+**Linux**:
+- /proc enumeration: Directory reads, fast
+- /proc/[pid]/maps parsing: File I/O, moderate
+- /proc/[pid]/mem reading: Requires ptrace or same user
+- /proc/[pid]/task parsing: Per-thread file I/O
+
+**macOS**:
+- sysctl KERN_PROC_ALL: Single syscall, fast
+- Memory/thread analysis: Not yet implemented
+
+### Running Tests
 
 ```bash
-# Run comprehensive benchmarks
-cargo bench
+# Run all tests including performance assertions
+cargo test
 
-# Profile specific operations
-cargo bench -- shellcode_detection
-cargo bench -- process_enumeration
+# Run tests with timing output
+cargo test -- --nocapture
 ```
 
 ## Tuning Guidelines
 
-### For High-Volume Environments
+### For Continuous Monitoring
 
-1. **Increase batch sizes**: Process 20-50 items per batch
-2. **Reduce scan frequency**: 2-5 second intervals
-3. **Enable result caching**: Cache stable process states
-4. **Use filtered scanning**: Skip known-good processes
+1. **Adjust scan interval**: Configure `scan_interval_ms` in DetectionConfig
+2. **Skip system processes**: Set `skip_system_processes = true`
+3. **Limit memory scans**: Reduce `max_memory_scan_size`
+4. **Disable heavy detections**: Turn off hook_detection and shellcode_detection
 
-### For Low-Latency Requirements
+### For One-Time Analysis
 
-1. **Decrease batch sizes**: Process 1-5 items per batch
-2. **Increase scan frequency**: Sub-second intervals
-3. **Disable heavy detections**: Skip complex ML analysis
-4. **Use memory-mapped scanning**: Direct memory access
-
-### Memory Optimization
-
-```rust
-// Configure memory limits
-let config = DetectionConfig {
-    max_memory_usage_mb: 200,
-    enable_result_compression: true,
-    cache_size_limit: 1000,
-    ..Default::default()
-};
-```
+1. **Enable all detections**: Use `DetectionConfig::thorough_mode()`
+2. **Full memory scanning**: Increase `max_memory_scan_size`
+3. **Include system processes**: Set `skip_system_processes = false`
 
 ## Platform-Specific Optimizations
 
 ### Windows
 
-- Use `SetProcessWorkingSetSize` to limit memory
-- Enable `SE_INCREASE_QUOTA_NAME` privilege for better access
-- Leverage Windows Performance Toolkit (WPT) for profiling
+- Run as Administrator for full process access
+- Use `PROCESS_QUERY_LIMITED_INFORMATION` when `PROCESS_QUERY_INFORMATION` fails
+- Handle access denied errors gracefully (system processes)
 
 ### Linux
 
-- Use `cgroups` for resource isolation
-- Enable `CAP_SYS_PTRACE` for enhanced process access
-- Leverage `perf` for detailed performance analysis
+- Run with appropriate privileges (root or CAP_SYS_PTRACE)
+- Handle permission denied for /proc/[pid]/mem gracefully
+- Consider using process groups for batch access
+
+### macOS
+
+- Limited functionality (process enumeration only)
+- Most detection features require kernel extensions or Endpoint Security framework
 
 ## Troubleshooting Performance Issues
 
 ### High CPU Usage
 
-1. Check scan frequency settings
-2. Verify filter effectiveness
-3. Profile detection module performance
-4. Consider disabling expensive detections
+1. Reduce scan frequency (`scan_interval_ms`)
+2. Disable thread analysis for each scan
+3. Skip memory region enumeration
+4. Filter out known-good processes
 
 ### High Memory Usage
 
-1. Monitor result cache sizes
-2. Check for memory leaks in custom modules
-3. Verify proper cleanup of process handles
-4. Consider reducing batch sizes
+1. Reduce baseline cache size (limited processes tracked)
+2. Clear detection history periodically
+3. Limit memory reading buffer sizes
 
 ### Slow Detection Response
 
-1. Profile individual detection modules
-2. Check system resource availability
-3. Verify network latency (if applicable)
-4. Consider async processing optimization
+1. Disable hook detection (expensive module enumeration)
+2. Skip shellcode pattern matching
+3. Use performance preset mode
 
-## Benchmarking Results
+## Current Implementation Limits
 
-### Baseline Performance (Intel i7-9700K, 32GB RAM)
+**What's NOT implemented**:
+- No performance metrics collection system
+- No Prometheus/monitoring integration
+- No SIMD-accelerated pattern matching
+- No parallel/async process scanning (single-threaded)
+- No LRU caching of results
+- No batch processing APIs
 
-```
-Process Enumeration:     2.3ms (avg)
-Shellcode Detection:     0.8ms per process
-Hook Detection:          1.2ms per process
-Anomaly Analysis:        3.5ms per process
-Full Scan (100 proc):    847ms total
-```
+**Current architecture**:
+- Sequential process scanning
+- Simple HashMap for baseline tracking
+- Basic confidence scoring
+- Manual timer-based intervals (TUI)
 
-### Memory Usage
-
-```
-Base Engine:            45MB
-+ Shellcode Patterns:   +12MB
-+ ML Models:           +23MB
-+ Result Cache:        +15MB (1000 entries)
-Total Runtime:         95MB typical
-```
-
-## Advanced Optimizations
-
-### SIMD Acceleration
+## Testing Performance
 
 ```rust
-// Enable SIMD for pattern matching
-#[cfg(target_feature = "avx2")]
-use std::arch::x86_64::*;
+#[test]
+fn test_detection_performance() {
+    use std::time::Instant;
 
-// Vectorized shellcode scanning
-unsafe fn simd_pattern_search(data: &[u8], pattern: &[u8]) -> bool {
-    // AVX2 accelerated pattern matching
-}
-```
+    let mut engine = DetectionEngine::new().unwrap();
+    let process = ProcessInfo::new(1234, 4, "test.exe".to_string());
+    let regions = vec![/* test regions */];
 
-### Multi-threading
-
-```rust
-use rayon::prelude::*;
-
-// Parallel process analysis
-let results: Vec<DetectionResult> = processes
-    .par_iter()
-    .map(|process| engine.analyze_process(process))
-    .collect();
-```
-
-### Caching Strategies
-
-```rust
-use lru::LruCache;
-
-pub struct DetectionCache {
-    process_hashes: LruCache<u32, u64>,
-    shellcode_results: LruCache<u64, bool>,
-    anomaly_profiles: LruCache<u32, ProcessProfile>,
-}
-```
-
-## Monitoring Dashboard Integration
-
-### Prometheus Metrics
-
-```rust
-use prometheus::{Counter, Histogram, Gauge};
-
-lazy_static! {
-    static ref SCAN_DURATION: Histogram = Histogram::new(
-        "ghost_scan_duration_seconds",
-        "Time spent scanning processes"
-    ).unwrap();
-    
-    static ref DETECTIONS_TOTAL: Counter = Counter::new(
-        "ghost_detections_total",
-        "Total number of detections"
-    ).unwrap();
-}
-```
-
-### Real-time Monitoring
-
-```rust
-// WebSocket-based real-time metrics
-pub struct MetricsServer {
-    connections: Vec<WebSocket>,
-    metrics_collector: PerformanceMonitor,
-}
-
-impl MetricsServer {
-    pub async fn broadcast_metrics(&self) {
-        let metrics = self.metrics_collector.get_real_time_stats();
-        let json = serde_json::to_string(&metrics).unwrap();
-        
-        for connection in &self.connections {
-            connection.send(json.clone()).await.ok();
-        }
+    let start = Instant::now();
+    for _ in 0..100 {
+        engine.analyze_process(&process, &regions, None);
     }
+    let duration = start.elapsed();
+
+    // Should complete 100 analyses in under 100ms
+    assert!(duration.as_millis() < 100);
 }
 ```
 
 ## Best Practices
 
-1. **Profile First**: Always benchmark before optimizing
-2. **Measure Impact**: Quantify optimization effectiveness
-3. **Monitor Production**: Continuous performance monitoring
-4. **Gradual Tuning**: Make incremental adjustments
-5. **Document Changes**: Track optimization history
+1. **Start with defaults**: Use `DetectionConfig::default()` initially
+2. **Profile specific modules**: Identify which detection is slow
+3. **Adjust based on needs**: Disable features you don't need
+4. **Handle errors gracefully**: Processes may exit during scan
+5. **Test on target hardware**: Performance varies by system
 
-## Performance Testing Framework
+## Future Performance Improvements
 
-```rust
-#[cfg(test)]
-mod performance_tests {
-    use super::*;
-    use std::time::Instant;
-    
-    #[test]
-    fn benchmark_full_system_scan() {
-        let engine = DetectionEngine::new().unwrap();
-        let start = Instant::now();
-        
-        let results = engine.scan_all_processes().unwrap();
-        let duration = start.elapsed();
-        
-        assert!(duration.as_millis() < 5000, "Scan took too long");
-        assert!(results.len() > 0, "No processes detected");
-    }
-    
-    #[test]
-    fn memory_usage_benchmark() {
-        let initial = get_memory_usage();
-        let engine = DetectionEngine::new().unwrap();
-        
-        // Perform operations
-        for _ in 0..1000 {
-            engine.analyze_dummy_process();
-        }
-        
-        let final_usage = get_memory_usage();
-        let growth = final_usage - initial;
-        
-        assert!(growth < 50_000_000, "Memory usage grew too much: {}MB", 
-                growth / 1_000_000);
-    }
-}
-```
-
-## Conclusion
-
-Ghost's performance can be fine-tuned for various deployment scenarios. Regular monitoring and benchmarking ensure optimal operation while maintaining security effectiveness.
-
-For additional performance support, see:
-
-- [Profiling Guide](PROFILING.md)
-- [Deployment Strategies](DEPLOYMENT.md)
-- [Scaling Recommendations](SCALING.md)
+Potential enhancements (not yet implemented):
+- Parallel process analysis using rayon
+- Async I/O for file system operations (Linux)
+- Result caching with TTL
+- Incremental scanning (only changed processes)
+- Memory-mapped file parsing
+- SIMD pattern matching for shellcode

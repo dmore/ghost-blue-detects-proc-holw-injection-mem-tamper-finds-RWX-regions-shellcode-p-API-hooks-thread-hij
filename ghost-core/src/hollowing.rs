@@ -1,5 +1,8 @@
 use crate::{GhostError, MemoryRegion, ProcessInfo, Result};
 
+#[cfg(windows)]
+use crate::memory::{validate_pe_header, read_pe_header_info, PEHeaderValidation};
+
 #[derive(Debug, Clone)]
 pub struct HollowingDetection {
     pub pid: u32,
@@ -14,6 +17,8 @@ pub enum HollowingIndicator {
     SuspiciousImageBase,
     MemoryLayoutAnomaly { expected_size: usize, actual_size: usize },
     MismatchedPEHeader,
+    InvalidPEHeader { validation: String },
+    CorruptedPEStructure { address: usize, reason: String },
     UnusualEntryPoint { address: usize },
     SuspiciousMemoryGaps { gap_count: usize, largest_gap: usize },
 }
@@ -27,6 +32,12 @@ impl std::fmt::Display for HollowingIndicator {
                 write!(f, "Memory layout anomaly: expected {:#x}, found {:#x}", expected_size, actual_size)
             }
             Self::MismatchedPEHeader => write!(f, "PE header mismatch detected"),
+            Self::InvalidPEHeader { validation } => {
+                write!(f, "Invalid PE header: {}", validation)
+            }
+            Self::CorruptedPEStructure { address, reason } => {
+                write!(f, "Corrupted PE structure at {:#x}: {}", address, reason)
+            }
             Self::UnusualEntryPoint { address } => {
                 write!(f, "Entry point at unusual location: {:#x}", address)
             }
@@ -72,10 +83,16 @@ impl HollowingDetector {
             confidence += 0.4;
         }
 
-        // Check for PE header anomalies
+        // Check for PE header anomalies (heuristic-based)
         if let Some(indicator) = self.check_pe_header_anomalies(memory_regions) {
             indicators.push(indicator);
             confidence += 0.7;
+        }
+
+        // Validate actual PE headers (deep inspection)
+        if let Some(indicator) = self.validate_pe_headers(process.pid, memory_regions) {
+            indicators.push(indicator);
+            confidence += 0.9; // Higher confidence for actual PE validation
         }
 
         // Check entry point location
@@ -220,6 +237,71 @@ impl HollowingDetector {
             }
         }
 
+        None
+    }
+
+    #[cfg(windows)]
+    fn validate_pe_headers(&self, pid: u32, regions: &[MemoryRegion]) -> Option<HollowingIndicator> {
+        // Focus on main executable IMAGE regions
+        let image_regions: Vec<_> = regions
+            .iter()
+            .filter(|r| r.region_type == "IMAGE")
+            .take(5) // Check first 5 IMAGE regions (main exe + critical DLLs)
+            .collect();
+
+        for region in image_regions {
+            match validate_pe_header(pid, region.base_address) {
+                Ok(validation) => {
+                    match validation {
+                        PEHeaderValidation::Valid => continue,
+                        PEHeaderValidation::InvalidDosSignature => {
+                            return Some(HollowingIndicator::InvalidPEHeader {
+                                validation: "Invalid DOS signature (not MZ)".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::InvalidNtSignature => {
+                            return Some(HollowingIndicator::InvalidPEHeader {
+                                validation: "Invalid NT signature (not PE)".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::InvalidHeaderOffset => {
+                            return Some(HollowingIndicator::InvalidPEHeader {
+                                validation: "Invalid PE header offset".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::MismatchedImageBase => {
+                            return Some(HollowingIndicator::CorruptedPEStructure {
+                                address: region.base_address,
+                                reason: "Image base mismatch - possible hollowing".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::SuspiciousEntryPoint => {
+                            return Some(HollowingIndicator::InvalidPEHeader {
+                                validation: "Suspicious entry point location".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::CorruptedHeader => {
+                            return Some(HollowingIndicator::CorruptedPEStructure {
+                                address: region.base_address,
+                                reason: "Corrupted PE header structure".to_string(),
+                            });
+                        }
+                        PEHeaderValidation::NotPE => continue,
+                    }
+                }
+                Err(_) => {
+                    // Could not read memory - might be suspicious but don't report
+                    continue;
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(not(windows))]
+    fn validate_pe_headers(&self, _pid: u32, _regions: &[MemoryRegion]) -> Option<HollowingIndicator> {
+        // PE validation is Windows-specific
         None
     }
 

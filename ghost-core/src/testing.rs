@@ -817,8 +817,10 @@ impl TestFramework {
         let threads: Vec<ThreadInfo> = params.thread_data.iter().map(|thread| {
             ThreadInfo {
                 tid: thread.tid,
+                owner_pid: process_info.pid,
                 start_address: thread.entry_point,
                 creation_time: 0,
+                state: crate::thread::ThreadState::Running,
             }
         }).collect();
 

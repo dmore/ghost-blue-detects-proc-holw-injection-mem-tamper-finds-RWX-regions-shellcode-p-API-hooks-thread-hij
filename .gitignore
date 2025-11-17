@@ -32,3 +32,8 @@ config.local.toml
 
 #Ai stuff
 .claude/
+.claude-plugins/
+.claude-embeddings/
+.claude*.cache/
+.claude*/
+
