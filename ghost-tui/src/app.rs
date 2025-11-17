@@ -1,9 +1,13 @@
+//! Application state and business logic for the Ghost TUI.
+//!
+//! This module manages the core application state, including process scanning,
+//! detection events, and user interaction state.
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ghost_core::{
-    DetectionEngine, DetectionResult, ProcessInfo, ThreatLevel, 
-    ThreatIntelligence, ThreatContext, IndicatorOfCompromise,
-    memory, process, thread
+    memory, process, thread, DetectionEngine, IndicatorOfCompromise, ProcessInfo, ThreatContext,
+    ThreatIntelligence, ThreatLevel,
 };
 use ratatui::widgets::{ListState, TableState};
 use serde::{Deserialize, Serialize};
@@ -100,13 +104,24 @@ pub struct App {
 }
 
 impl App {
+    /// Creates a new application instance with initialized detection engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the detection engine or threat intelligence
+    /// system fails to initialize.
     pub async fn new() -> Result<Self> {
         let mut threat_intel = ThreatIntelligence::new();
-        threat_intel.initialize_default_feeds().await?;
-        
+        if let Err(e) = threat_intel.initialize_default_feeds().await {
+            log::warn!("Failed to initialize threat feeds: {}", e);
+        }
+
+        let detection_engine = DetectionEngine::new()
+            .map_err(|e| anyhow::anyhow!("Failed to initialize detection engine: {}", e))?;
+
         let mut app = Self {
             current_tab: TabIndex::Overview,
-            detection_engine: DetectionEngine::new(),
+            detection_engine,
             threat_intel,
             processes: Vec::new(),
             detections: VecDeque::new(),
@@ -136,62 +151,71 @@ impl App {
             max_detection_entries: 500,
         };
 
-        app.add_log_message("Ghost TUI v0.1.0 - Process Injection Detection".to_string());
-        app.add_log_message("Initializing detection engine...".to_string());
-        
-        // Initial scan
-        app.update_scan_data().await?;
-        
+        app.add_log_message("Ghost TUI v0.1.0 - Process Injection Detection".into());
+        app.add_log_message("Detection engine initialized successfully".into());
+
+        if let Err(e) = app.update_scan_data().await {
+            app.add_log_message(format!("Initial scan failed: {}", e));
+        }
+
         Ok(app)
     }
 
+    /// Performs a full system scan for process injection indicators.
+    ///
+    /// This method enumerates all running processes, analyzes their memory
+    /// regions and threads, and records any suspicious or malicious findings.
     pub async fn update_scan_data(&mut self) -> Result<()> {
         let scan_start = Instant::now();
-        
-        // Enumerate processes
-        self.processes = process::enumerate_processes()?;
+
+        self.processes = match process::enumerate_processes() {
+            Ok(procs) => procs,
+            Err(e) => {
+                self.add_log_message(format!("Process enumeration failed: {}", e));
+                return Err(anyhow::anyhow!("Process enumeration failed: {}", e));
+            }
+        };
+
         let mut detection_count = 0;
         let mut suspicious_count = 0;
         let mut malicious_count = 0;
 
-        // Scan each process for injections
         for proc in &self.processes {
-            // Skip system processes for performance
-            if proc.name == "System" || proc.name == "Registry" {
+            if Self::should_skip_process(proc) {
                 continue;
             }
 
-            if let Ok(regions) = memory::enumerate_memory_regions(proc.pid) {
-                let threads = thread::enumerate_threads(proc.pid).ok();
-                let result = self.detection_engine.analyze_process(
-                    proc, 
-                    &regions, 
-                    threads.as_deref()
-                );
+            let regions = match memory::enumerate_memory_regions(proc.pid) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
 
-                match result.threat_level {
-                    ThreatLevel::Suspicious => suspicious_count += 1,
-                    ThreatLevel::Malicious => malicious_count += 1,
-                    ThreatLevel::Clean => {}
-                }
+            let threads = thread::enumerate_threads(proc.pid).ok();
+            let result = self
+                .detection_engine
+                .analyze_process(proc, &regions, threads.as_deref());
 
-                if result.threat_level != ThreatLevel::Clean {
-                    detection_count += 1;
-                    self.add_detection(DetectionEvent {
-                        timestamp: Utc::now(),
-                        process: proc.clone(),
-                        threat_level: result.threat_level,
-                        indicators: result.indicators,
-                        confidence: result.confidence,
-                        threat_context: None, // TODO: Integrate threat intelligence
-                    });
-                }
+            match result.threat_level {
+                ThreatLevel::Suspicious => suspicious_count += 1,
+                ThreatLevel::Malicious => malicious_count += 1,
+                ThreatLevel::Clean => {}
+            }
+
+            if result.threat_level != ThreatLevel::Clean {
+                detection_count += 1;
+                self.add_detection(DetectionEvent {
+                    timestamp: Utc::now(),
+                    process: proc.clone(),
+                    threat_level: result.threat_level,
+                    indicators: result.indicators,
+                    confidence: result.confidence,
+                    threat_context: result.threat_context,
+                });
             }
         }
 
         let scan_duration = scan_start.elapsed();
-        
-        // Update statistics
+
         self.stats = SystemStats {
             total_processes: self.processes.len(),
             suspicious_processes: suspicious_count,
@@ -202,16 +226,21 @@ impl App {
         };
 
         self.last_scan = Some(scan_start);
-        
-        if detection_count > 0 {
-            self.add_log_message(format!(
-                "Scan complete: {} detections found in {}ms",
-                detection_count,
-                scan_duration.as_millis()
-            ));
-        }
+
+        self.add_log_message(format!(
+            "Scan complete: {} processes, {} detections in {}ms",
+            self.processes.len(),
+            detection_count,
+            scan_duration.as_millis()
+        ));
 
         Ok(())
+    }
+
+    /// Determines if a process should be skipped during scanning.
+    fn should_skip_process(proc: &ProcessInfo) -> bool {
+        const SKIP_PROCESSES: &[&str] = &["System", "Registry", "Idle", "smss.exe"];
+        SKIP_PROCESSES.iter().any(|&name| proc.name == name) || proc.pid == 0 || proc.pid == 4
     }
 
     pub async fn force_refresh(&mut self) -> Result<()> {

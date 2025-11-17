@@ -1,0 +1,53 @@
+# Ghost Detection Engine Configuration
+# This file contains all configurable options for the detection engine.
+
+# Enable or disable shellcode pattern detection
+shellcode_detection = true
+
+# Enable or disable process hollowing detection
+hollowing_detection = true
+
+# Enable or disable Windows hook injection detection
+hook_detection = true
+
+# Minimum confidence threshold for suspicious classification (0.0 - 1.0)
+# Lower values are more sensitive but may produce false positives
+confidence_threshold = 0.3
+
+# Skip known safe system processes to improve performance
+skip_system_processes = true
+
+# Maximum memory size to scan per process in bytes (100MB default)
+max_memory_scan_size = 104857600
+
+# Enable thread behavior analysis
+thread_analysis_enabled = true
+
+# Enable evasion technique detection (anti-debugging, VM detection, etc.)
+evasion_detection = true
+
+# Enable MITRE ATT&CK framework mapping
+mitre_mapping = true
+
+# Scan interval in milliseconds for continuous monitoring
+scan_interval_ms = 2000
+
+# Optional process filter configuration
+[process_filter]
+# Whitelist: only scan these processes (empty means scan all)
+whitelist = []
+
+# Blacklist: never scan these processes
+blacklist = []
+
+# System processes to skip (Windows-specific)
+system_processes = [
+    "csrss.exe",
+    "wininit.exe",
+    "winlogon.exe",
+    "dwm.exe",
+    "explorer.exe",
+    "smss.exe",
+    "services.exe",
+    "lsass.exe"
+]

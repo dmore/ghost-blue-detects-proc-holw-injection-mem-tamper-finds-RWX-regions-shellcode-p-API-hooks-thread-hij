@@ -1,25 +1,34 @@
+//! Terminal User Interface rendering for Ghost detection system.
+//!
+//! This module provides all the drawing functions for the TUI components,
+//! including the main dashboard, process list, detection history, and system logs.
+
 use crate::app::{App, TabIndex};
 use ghost_core::ThreatLevel;
 use ratatui::{
     backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    symbols,
     text::{Line, Span, Text},
-    widgets::{
-        BarChart, Block, Borders, Cell, Gauge, List, ListItem, Paragraph, Row, Sparkline, Table, Tabs, Wrap
-    },
+    widgets::{Block, Borders, Cell, Gauge, List, ListItem, Paragraph, Row, Table, Tabs, Wrap},
     Frame,
 };
 
-// Define color constants for consistent theming
-const PRIMARY_COLOR: Color = Color::Cyan;
-const SECONDARY_COLOR: Color = Color::Magenta;
-const SUCCESS_COLOR: Color = Color::Green;
-const WARNING_COLOR: Color = Color::Yellow;
-const DANGER_COLOR: Color = Color::Red;
-const BACKGROUND_COLOR: Color = Color::Black;
-const TEXT_COLOR: Color = Color::White;
+/// Color scheme for consistent theming across the application.
+mod colors {
+    use ratatui::style::Color;
+
+    pub const PRIMARY: Color = Color::Cyan;
+    pub const SECONDARY: Color = Color::Magenta;
+    pub const SUCCESS: Color = Color::Green;
+    pub const WARNING: Color = Color::Yellow;
+    pub const DANGER: Color = Color::Red;
+    pub const BACKGROUND: Color = Color::Black;
+    pub const TEXT: Color = Color::White;
+    pub const MUTED: Color = Color::Gray;
+}
+
+use colors::*;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App) {
     let size = f.size();
@@ -56,17 +65,17 @@ fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("👻 Ghost - Process Injection Detection")
-                .title_style(Style::default().fg(PRIMARY_COLOR).add_modifier(Modifier::BOLD))
-                .border_style(Style::default().fg(PRIMARY_COLOR))
+                .title("Ghost - Process Injection Detection")
+                .title_style(Style::default().fg(PRIMARY).add_modifier(Modifier::BOLD))
+                .border_style(Style::default().fg(PRIMARY)),
         )
         .select(app.current_tab as usize)
-        .style(Style::default().fg(TEXT_COLOR))
+        .style(Style::default().fg(TEXT))
         .highlight_style(
             Style::default()
-                .fg(BACKGROUND_COLOR)
-                .bg(PRIMARY_COLOR)
-                .add_modifier(Modifier::BOLD)
+                .fg(BACKGROUND)
+                .bg(PRIMARY)
+                .add_modifier(Modifier::BOLD),
         );
 
     f.render_widget(tabs, area);
@@ -74,20 +83,20 @@ fn draw_header<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
 
 fn draw_footer<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
     let help_text = match app.current_tab {
-        TabIndex::Overview => "↑↓: Navigate | Tab: Switch tabs | R: Refresh | C: Clear | Q: Quit",
-        TabIndex::Processes => "↑↓: Select process | Enter: View details | Tab: Switch tabs | Q: Quit",
-        TabIndex::Detections => "↑↓: Navigate detections | C: Clear history | Tab: Switch tabs | Q: Quit",
-        TabIndex::Memory => "↑↓: Navigate | Tab: Switch tabs | R: Refresh | Q: Quit",
-        TabIndex::Logs => "↑↓: Navigate logs | C: Clear logs | Tab: Switch tabs | Q: Quit",
+        TabIndex::Overview => "Up/Down: Navigate | Tab: Switch tabs | R: Refresh | C: Clear | Q: Quit",
+        TabIndex::Processes => "Up/Down: Select process | Enter: View details | Tab: Switch tabs | Q: Quit",
+        TabIndex::Detections => "Up/Down: Navigate detections | C: Clear history | Tab: Switch tabs | Q: Quit",
+        TabIndex::Memory => "Up/Down: Navigate | Tab: Switch tabs | R: Refresh | Q: Quit",
+        TabIndex::Logs => "Up/Down: Navigate logs | C: Clear logs | Tab: Switch tabs | Q: Quit",
     };
 
     let footer = Paragraph::new(help_text)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(SECONDARY_COLOR))
+                .border_style(Style::default().fg(SECONDARY)),
         )
-        .style(Style::default().fg(TEXT_COLOR))
+        .style(Style::default().fg(TEXT))
         .alignment(Alignment::Center);
 
     f.render_widget(footer, area);
@@ -124,61 +133,61 @@ fn draw_stats_panel<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         ])
         .split(area);
 
-    // Total processes
     let total_processes = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Total Processes")
-                .border_style(Style::default().fg(PRIMARY_COLOR))
+                .border_style(Style::default().fg(PRIMARY)),
         )
-        .gauge_style(Style::default().fg(PRIMARY_COLOR))
-        .percent(std::cmp::min(app.stats.total_processes * 100 / 500, 100) as u16)
+        .gauge_style(Style::default().fg(PRIMARY))
+        .percent(std::cmp::min(app.stats.total_processes.saturating_mul(100) / 500, 100) as u16)
         .label(format!("{}", app.stats.total_processes));
 
     f.render_widget(total_processes, stats_chunks[0]);
 
-    // Suspicious processes
     let suspicious_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Suspicious")
-                .border_style(Style::default().fg(WARNING_COLOR))
+                .border_style(Style::default().fg(WARNING)),
         )
-        .gauge_style(Style::default().fg(WARNING_COLOR))
+        .gauge_style(Style::default().fg(WARNING))
         .percent(if app.stats.total_processes > 0 {
-            (app.stats.suspicious_processes * 100 / app.stats.total_processes) as u16
-        } else { 0 })
+            (app.stats.suspicious_processes.saturating_mul(100) / app.stats.total_processes) as u16
+        } else {
+            0
+        })
         .label(format!("{}", app.stats.suspicious_processes));
 
     f.render_widget(suspicious_gauge, stats_chunks[1]);
 
-    // Malicious processes
     let malicious_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Malicious")
-                .border_style(Style::default().fg(DANGER_COLOR))
+                .border_style(Style::default().fg(DANGER)),
         )
-        .gauge_style(Style::default().fg(DANGER_COLOR))
+        .gauge_style(Style::default().fg(DANGER))
         .percent(if app.stats.total_processes > 0 {
-            (app.stats.malicious_processes * 100 / app.stats.total_processes) as u16
-        } else { 0 })
+            (app.stats.malicious_processes.saturating_mul(100) / app.stats.total_processes) as u16
+        } else {
+            0
+        })
         .label(format!("{}", app.stats.malicious_processes));
 
     f.render_widget(malicious_gauge, stats_chunks[2]);
 
-    // Scan performance
     let perf_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title("Scan Time (ms)")
-                .border_style(Style::default().fg(SUCCESS_COLOR))
+                .border_style(Style::default().fg(SUCCESS)),
         )
-        .gauge_style(Style::default().fg(SUCCESS_COLOR))
+        .gauge_style(Style::default().fg(SUCCESS))
         .percent(std::cmp::min(app.stats.scan_time_ms as u16 / 10, 100))
         .label(format!("{}ms", app.stats.scan_time_ms));
 
@@ -195,24 +204,27 @@ fn draw_threat_gauge<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
     };
 
     let color = if threat_level > 80 {
-        DANGER_COLOR
+        DANGER
     } else if threat_level > 40 {
-        WARNING_COLOR
+        WARNING
     } else {
-        SUCCESS_COLOR
+        SUCCESS
     };
 
     let threat_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("🚨 System Threat Level")
+                .title("System Threat Level")
                 .title_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-                .border_style(Style::default().fg(color))
+                .border_style(Style::default().fg(color)),
         )
         .gauge_style(Style::default().fg(color))
         .percent(threat_level)
-        .label(format!("{}% - {} Detection(s)", threat_level, app.stats.total_detections));
+        .label(format!(
+            "{}% - {} Detection(s)",
+            threat_level, app.stats.total_detections
+        ));
 
     f.render_widget(threat_gauge, area);
 }
@@ -223,23 +235,23 @@ fn draw_recent_detections<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .iter()
         .take(10)
         .map(|detection| {
-            let level_icon = match detection.threat_level {
-                ThreatLevel::Malicious => "🔴",
-                ThreatLevel::Suspicious => "🟡",
-                ThreatLevel::Clean => "🟢",
+            let (level_marker, style) = match detection.threat_level {
+                ThreatLevel::Malicious => ("[!]", Style::default().fg(DANGER)),
+                ThreatLevel::Suspicious => ("[?]", Style::default().fg(WARNING)),
+                ThreatLevel::Clean => ("[+]", Style::default().fg(SUCCESS)),
             };
-            
+
             let time = detection.timestamp.format("%H:%M:%S");
             let content = format!(
                 "{} [{}] {} (PID: {}) - {:.1}%",
-                level_icon,
+                level_marker,
                 time,
                 detection.process.name,
                 detection.process.pid,
                 detection.confidence * 100.0
             );
-            
-            ListItem::new(content).style(Style::default().fg(TEXT_COLOR))
+
+            ListItem::new(content).style(style)
         })
         .collect();
 
@@ -247,10 +259,10 @@ fn draw_recent_detections<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("🔍 Recent Detections")
-                .border_style(Style::default().fg(SECONDARY_COLOR))
+                .title("Recent Detections")
+                .border_style(Style::default().fg(SECONDARY)),
         )
-        .style(Style::default().fg(TEXT_COLOR));
+        .style(Style::default().fg(TEXT));
 
     f.render_widget(list, area);
 }
@@ -264,25 +276,24 @@ fn draw_processes<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
     // Process table
     let header_cells = ["PID", "PPID", "Name", "Threads", "Status"]
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(PRIMARY_COLOR).add_modifier(Modifier::BOLD)));
+        .map(|h| Cell::from(*h).style(Style::default().fg(PRIMARY).add_modifier(Modifier::BOLD)));
     
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
     let rows: Vec<Row> = app.processes.iter().map(|proc| {
-        let status = if app.detections.iter().any(|d| d.process.pid == proc.pid) {
-            match app.detections.iter().find(|d| d.process.pid == proc.pid).unwrap().threat_level {
-                ThreatLevel::Malicious => "🔴 MALICIOUS",
-                ThreatLevel::Suspicious => "🟡 SUSPICIOUS",
-                ThreatLevel::Clean => "🟢 CLEAN",
-            }
-        } else {
-            "🟢 CLEAN"
+        let status = match app.detections.iter().find(|d| d.process.pid == proc.pid) {
+            Some(detection) => match detection.threat_level {
+                ThreatLevel::Malicious => "MALICIOUS",
+                ThreatLevel::Suspicious => "SUSPICIOUS",
+                ThreatLevel::Clean => "CLEAN",
+            },
+            None => "CLEAN",
         };
 
         Row::new(vec![
             Cell::from(proc.pid.to_string()),
             Cell::from(proc.ppid.to_string()),
-            Cell::from(proc.name.clone()),
+            Cell::from(proc.name.as_str()),
             Cell::from(proc.thread_count.to_string()),
             Cell::from(status),
         ])
@@ -293,10 +304,10 @@ fn draw_processes<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("🖥️  System Processes")
-                .border_style(Style::default().fg(PRIMARY_COLOR))
+                .title("System Processes")
+                .border_style(Style::default().fg(PRIMARY)),
         )
-        .highlight_style(Style::default().bg(PRIMARY_COLOR).fg(BACKGROUND_COLOR))
+        .highlight_style(Style::default().bg(PRIMARY).fg(BACKGROUND))
         .widths(&[
             Constraint::Length(8),
             Constraint::Length(8),
@@ -305,7 +316,8 @@ fn draw_processes<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
             Constraint::Length(15),
         ]);
 
-    f.render_stateful_widget(table, chunks[0], &mut app.processes_state.clone());
+    let mut state = app.processes_state.clone();
+    f.render_stateful_widget(table, chunks[0], &mut state);
 
     // Process details panel
     draw_process_details(f, chunks[1], app);
@@ -329,10 +341,10 @@ fn draw_process_details<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("📋 Process Details")
-                .border_style(Style::default().fg(SECONDARY_COLOR))
+                .title("Process Details")
+                .border_style(Style::default().fg(SECONDARY)),
         )
-        .style(Style::default().fg(TEXT_COLOR))
+        .style(Style::default().fg(TEXT))
         .wrap(Wrap { trim: true });
 
     f.render_widget(paragraph, area);
@@ -344,30 +356,33 @@ fn draw_detections<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .iter()
         .map(|detection| {
             let level_style = match detection.threat_level {
-                ThreatLevel::Malicious => Style::default().fg(DANGER_COLOR),
-                ThreatLevel::Suspicious => Style::default().fg(WARNING_COLOR),
-                ThreatLevel::Clean => Style::default().fg(SUCCESS_COLOR),
+                ThreatLevel::Malicious => Style::default().fg(DANGER),
+                ThreatLevel::Suspicious => Style::default().fg(WARNING),
+                ThreatLevel::Clean => Style::default().fg(SUCCESS),
             };
 
             let content = vec![
                 Line::from(vec![
                     Span::styled(
                         format!("[{}] ", detection.timestamp.format("%Y-%m-%d %H:%M:%S")),
-                        Style::default().fg(Color::Gray)
+                        Style::default().fg(MUTED),
                     ),
                     Span::styled(
                         format!("{:?}", detection.threat_level),
-                        level_style.add_modifier(Modifier::BOLD)
+                        level_style.add_modifier(Modifier::BOLD),
                     ),
                 ]),
-                Line::from(format!("Process: {} (PID: {})", detection.process.name, detection.process.pid)),
+                Line::from(format!(
+                    "Process: {} (PID: {})",
+                    detection.process.name, detection.process.pid
+                )),
                 Line::from(format!("Confidence: {:.1}%", detection.confidence * 100.0)),
                 Line::from("Indicators:"),
             ];
 
             let mut all_lines = content;
             for indicator in &detection.indicators {
-                all_lines.push(Line::from(format!("  • {}", indicator)));
+                all_lines.push(Line::from(format!("  - {}", indicator)));
             }
             all_lines.push(Line::from(""));
 
@@ -379,12 +394,13 @@ fn draw_detections<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("🚨 Detection History ({} total)", app.detections.len()))
-                .border_style(Style::default().fg(DANGER_COLOR))
+                .title(format!("Detection History ({} total)", app.detections.len()))
+                .border_style(Style::default().fg(DANGER)),
         )
-        .style(Style::default().fg(TEXT_COLOR));
+        .style(Style::default().fg(TEXT));
 
-    f.render_stateful_widget(list, area, &mut app.detections_state.clone());
+    let mut state = app.detections_state.clone();
+    f.render_stateful_widget(list, area, &mut state);
 }
 
 fn draw_memory<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
@@ -393,36 +409,34 @@ fn draw_memory<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
         .constraints([Constraint::Length(8), Constraint::Min(0)])
         .split(area);
 
-    // Memory usage gauge
     let memory_gauge = Gauge::default()
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("💾 Memory Usage")
-                .border_style(Style::default().fg(PRIMARY_COLOR))
+                .title("Memory Usage")
+                .border_style(Style::default().fg(PRIMARY)),
         )
-        .gauge_style(Style::default().fg(PRIMARY_COLOR))
+        .gauge_style(Style::default().fg(PRIMARY))
         .percent((app.stats.memory_usage_mb * 10.0) as u16)
         .label(format!("{:.2} MB", app.stats.memory_usage_mb));
 
     f.render_widget(memory_gauge, chunks[0]);
 
-    // Memory analysis placeholder
     let memory_info = Paragraph::new(
         "Memory Analysis:\n\n\
-        • Process memory regions scanned\n\
-        • RWX regions monitored\n\
-        • Suspicious allocations detected\n\
-        • Memory layout anomalies tracked\n\n\
-        Advanced memory analysis features coming soon..."
+        - Process memory regions scanned\n\
+        - RWX regions monitored\n\
+        - Suspicious allocations detected\n\
+        - Memory layout anomalies tracked\n\n\
+        Advanced memory analysis features coming soon...",
     )
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title("🧠 Memory Analysis")
-            .border_style(Style::default().fg(SECONDARY_COLOR))
+            .title("Memory Analysis")
+            .border_style(Style::default().fg(SECONDARY)),
     )
-    .style(Style::default().fg(TEXT_COLOR))
+    .style(Style::default().fg(TEXT))
     .wrap(Wrap { trim: true });
 
     f.render_widget(memory_info, chunks[1]);
@@ -432,17 +446,18 @@ fn draw_logs<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
     let items: Vec<ListItem> = app
         .logs
         .iter()
-        .map(|log| ListItem::new(log.as_str()).style(Style::default().fg(TEXT_COLOR)))
+        .map(|log| ListItem::new(log.as_str()).style(Style::default().fg(TEXT)))
         .collect();
 
     let list = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("📜 System Logs ({} entries)", app.logs.len()))
-                .border_style(Style::default().fg(SUCCESS_COLOR))
+                .title(format!("System Logs ({} entries)", app.logs.len()))
+                .border_style(Style::default().fg(SUCCESS)),
         )
-        .style(Style::default().fg(TEXT_COLOR));
+        .style(Style::default().fg(TEXT));
 
-    f.render_stateful_widget(list, area, &mut app.logs_state.clone());
+    let mut state = app.logs_state.clone();
+    f.render_stateful_widget(list, area, &mut state);
 }

@@ -799,6 +799,7 @@ impl TestFramework {
         // Create test data
         let process_info = ProcessInfo {
             pid: params.process_data.pid,
+            ppid: 1,
             name: params.process_data.name.clone(),
             path: params.process_data.path.clone(),
             thread_count: params.process_data.thread_count,
@@ -809,20 +810,20 @@ impl TestFramework {
                 base_address: mem.base_address,
                 size: mem.size,
                 protection: mem.protection.clone(),
+                region_type: "PRIVATE".to_string(),
             }
         }).collect();
 
         let threads: Vec<ThreadInfo> = params.thread_data.iter().map(|thread| {
             ThreadInfo {
                 tid: thread.tid,
-                entry_point: thread.entry_point,
-                stack_base: thread.stack_base,
-                stack_size: thread.stack_size,
+                start_address: thread.entry_point,
+                creation_time: 0,
             }
         }).collect();
 
         // Run detection
-        let result = engine.analyze_process(&process_info, &memory_regions, &threads);
+        let result = engine.analyze_process(&process_info, &memory_regions, Some(&threads));
 
         // Validate result
         match expected {

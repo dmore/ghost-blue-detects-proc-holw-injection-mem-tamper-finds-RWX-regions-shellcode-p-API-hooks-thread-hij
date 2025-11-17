@@ -1,32 +1,61 @@
-﻿use crate::{
-    detect_hook_injection, AnomalyDetector, MemoryProtection, MemoryRegion, 
-    ProcessInfo, ShellcodeDetector, ThreadInfo, ThreatIntelligence, ThreatContext,
-    EvasionDetector, EvasionResult, DetectionConfig, GhostError,
-    MitreAttackEngine, MitreAnalysisResult,
+//! Core detection engine for process injection analysis.
+//!
+//! This module provides the main detection orchestration, combining multiple
+//! analysis techniques including memory scanning, shellcode detection,
+//! process hollowing detection, and behavioral anomaly analysis.
+
+use crate::{
+    detect_hook_injection, AnomalyDetector, DetectionConfig, EvasionDetector, EvasionResult,
+    GhostError, MemoryProtection, MemoryRegion, MitreAnalysisResult, MitreAttackEngine,
+    ProcessInfo, ShellcodeDetector, ThreadInfo, ThreatContext, ThreatIntelligence,
 };
 #[cfg(target_os = "linux")]
 use crate::EbpfDetector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Threat classification levels for detected processes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ThreatLevel {
+    /// Process appears normal with no suspicious indicators.
     Clean,
+    /// Process exhibits potentially malicious behavior requiring investigation.
     Suspicious,
+    /// Process shows strong indicators of malicious activity.
     Malicious,
 }
 
+impl ThreatLevel {
+    /// Returns a human-readable description of the threat level.
+    pub fn description(&self) -> &'static str {
+        match self {
+            ThreatLevel::Clean => "No threats detected",
+            ThreatLevel::Suspicious => "Potential security concern",
+            ThreatLevel::Malicious => "High confidence malicious activity",
+        }
+    }
+}
+
+/// Result of analyzing a process for injection indicators.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionResult {
+    /// Information about the analyzed process.
     pub process: ProcessInfo,
+    /// Overall threat classification.
     pub threat_level: ThreatLevel,
+    /// List of specific indicators that contributed to the detection.
     pub indicators: Vec<String>,
+    /// Confidence score from 0.0 to 1.0 indicating detection certainty.
     pub confidence: f32,
+    /// Optional threat intelligence context with IOC matches.
     pub threat_context: Option<ThreatContext>,
+    /// Optional analysis of evasion techniques used.
     pub evasion_analysis: Option<EvasionResult>,
+    /// Optional MITRE ATT&CK framework mapping.
     pub mitre_analysis: Option<MitreAnalysisResult>,
 }
 
+/// Main detection engine that orchestrates all analysis components.
 pub struct DetectionEngine {
     baseline: HashMap<u32, ProcessBaseline>,
     shellcode_detector: ShellcodeDetector,
@@ -40,6 +69,7 @@ pub struct DetectionEngine {
     ebpf_detector: Option<EbpfDetector>,
 }
 
+/// Baseline metrics for a process used to detect behavioral changes.
 #[derive(Debug, Clone)]
 struct ProcessBaseline {
     thread_count: u32,
@@ -47,37 +77,51 @@ struct ProcessBaseline {
 }
 
 impl DetectionEngine {
+    /// Creates a new detection engine with default configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the MITRE ATT&CK engine fails to initialize.
     pub fn new() -> Result<Self, GhostError> {
         Self::with_config(None)
     }
 
+    /// Creates a new detection engine with custom configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Optional configuration for filtering and tuning detection behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the MITRE ATT&CK engine fails to initialize.
     pub fn with_config(config: Option<DetectionConfig>) -> Result<Self, GhostError> {
-        let baseline = ProcessBaseline::new();
         let shellcode_detector = ShellcodeDetector::new();
         let hollowing_detector = HollowingDetector::new();
         let anomaly_detector = AnomalyDetector::new();
         let threat_intelligence = ThreatIntelligence::new();
         let evasion_detector = EvasionDetector::new();
         let mitre_engine = MitreAttackEngine::new()?;
-        
+
         #[cfg(target_os = "linux")]
         let ebpf_detector = match EbpfDetector::new() {
             Ok(mut detector) => {
                 if let Err(e) = detector.initialize() {
-                    eprintln!("Warning: Failed to initialize eBPF detector: {:?}", e);
+                    log::warn!("Failed to initialize eBPF detector: {:?}", e);
                     None
                 } else {
+                    log::info!("eBPF detector initialized successfully");
                     Some(detector)
                 }
             }
             Err(e) => {
-                eprintln!("Warning: Failed to create eBPF detector: {:?}", e);
+                log::warn!("Failed to create eBPF detector: {:?}", e);
                 None
             }
         };
-        
+
         Ok(DetectionEngine {
-            baseline,
+            baseline: HashMap::new(),
             shellcode_detector,
             hollowing_detector,
             anomaly_detector,
@@ -546,6 +590,6 @@ impl DetectionEngine {
 
 impl Default for DetectionEngine {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default DetectionEngine")
     }
 }

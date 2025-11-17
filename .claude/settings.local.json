@@ -4,7 +4,13 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(cargo new:*)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo build:*)",
+      "Bash(source ~/.zshrc)",
+      "Bash(source ~/.cargo/env)"
     ],
     "deny": [],
     "ask": []

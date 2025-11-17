@@ -1,13 +1,15 @@
+//! Ghost CLI - Process Injection Detection Framework
+//!
+//! A cross-platform command-line tool for detecting process injection,
+//! process hollowing, and other malicious code injection techniques.
+
 use anyhow::Result;
 use clap::{Arg, Command};
-use ghost_core::{memory, process, thread, DetectionEngine, DetectionConfig, ThreatLevel};
+use ghost_core::{memory, process, thread, DetectionConfig, DetectionEngine, ThreatLevel};
 use log::{debug, error, info, warn};
-use serde_json;
 use std::time::Instant;
 
 fn main() -> Result<()> {
-    env_logger::init();
-
     let matches = Command::new("ghost")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Cross-Platform Process Injection Detection Framework")
@@ -89,26 +91,35 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    // Initialize logging based on debug flag
-    if matches.get_flag("debug") {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Debug)
-            .init();
-        debug!("Debug logging enabled");
+    let debug_mode = matches.get_flag("debug");
+    let quiet = matches.get_flag("quiet");
+
+    // Initialize logging based on flags
+    let log_level = if debug_mode {
+        log::LevelFilter::Debug
+    } else if quiet {
+        log::LevelFilter::Error
     } else {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Info)
-            .init();
+        log::LevelFilter::Info
+    };
+
+    env_logger::Builder::from_default_env()
+        .filter_level(log_level)
+        .init();
+
+    if debug_mode {
+        debug!("Debug logging enabled");
     }
 
-    let format = matches.get_one::<String>("format").unwrap();
+    let format = matches
+        .get_one::<String>("format")
+        .expect("format has default value");
     let verbose = matches.get_flag("verbose");
-    let quiet = matches.get_flag("quiet");
     let target_pid = matches.get_one::<String>("pid");
     let target_process = matches.get_one::<String>("process");
     let output_file = matches.get_one::<String>("output");
     let config_file = matches.get_one::<String>("config");
-    let mitre_analysis = matches.get_flag("mitre-analysis");
+    let _mitre_analysis = matches.get_flag("mitre-analysis");
     let mitre_stats = matches.get_flag("mitre-stats");
 
     // Load configuration if specified
