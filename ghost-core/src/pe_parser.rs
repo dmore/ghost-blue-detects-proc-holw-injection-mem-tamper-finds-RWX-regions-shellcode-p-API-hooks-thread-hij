@@ -434,7 +434,9 @@ pub fn parse_iat_from_memory(
     _base_address: usize,
     _memory_reader: impl Fn(u32, usize, usize) -> Result<Vec<u8>>,
 ) -> Result<Vec<ImportEntry>> {
-    Err(GhostError::PlatformNotSupported { feature: "IAT parsing not implemented for this platform".to_string() })
+    Err(GhostError::PlatformNotSupported {
+        feature: "IAT parsing not implemented for this platform".to_string(),
+    })
 }
 
 #[cfg(not(windows))]
@@ -444,5 +446,7 @@ pub fn detect_iat_hooks(
     _disk_path: &str,
     _memory_reader: impl Fn(u32, usize, usize) -> Result<Vec<u8>>,
 ) -> Result<IATHookResult> {
-    Err(GhostError::PlatformNotSupported { feature: "IAT hook detection not implemented for this platform".to_string() })
+    Err(GhostError::PlatformNotSupported {
+        feature: "IAT hook detection not implemented for this platform".to_string(),
+    })
 }

@@ -118,9 +118,12 @@ impl DynamicYaraEngine {
 
     /// Compile all YARA rules from the rules directory
     pub fn compile_rules(&mut self) -> Result<usize, GhostError> {
-        let rules_dir = self.rules_path.as_ref().ok_or_else(|| {
-            GhostError::Configuration { message: "No rules directory configured".to_string() }
-        })?;
+        let rules_dir = self
+            .rules_path
+            .as_ref()
+            .ok_or_else(|| GhostError::Configuration {
+                message: "No rules directory configured".to_string(),
+            })?;
 
         if !rules_dir.exists() {
             return Err(GhostError::ConfigurationError(format!(
@@ -129,8 +132,9 @@ impl DynamicYaraEngine {
             )));
         }
 
-        let mut compiler = Compiler::new()
-            .map_err(|e| GhostError::Configuration { message: format!("YARA compiler error: {}", e) })?;
+        let mut compiler = Compiler::new().map_err(|e| GhostError::Configuration {
+            message: format!("YARA compiler error: {}", e),
+        })?;
 
         let mut rule_count = 0;
         self.rule_metadata.clear();
@@ -176,9 +180,14 @@ impl DynamicYaraEngine {
             ));
         }
 
-        self.compiled_rules = Some(compiler.compile_rules().map_err(|e| {
-            GhostError::Configuration { message: format!("Rule compilation failed: {}", e })
-        })?);
+        self.compiled_rules =
+            Some(
+                compiler
+                    .compile_rules()
+                    .map_err(|e| GhostError::Configuration {
+                        message: format!("Rule compilation failed: {}", e),
+                    })?,
+            );
 
         log::info!("Successfully compiled {} YARA rules", rule_count);
         Ok(rule_count)
@@ -192,8 +201,8 @@ impl DynamicYaraEngine {
             return Ok(rule_files);
         }
 
-        let entries = fs::read_dir(dir).map_err(|e| {
-            GhostError::Configuration { message: format!("Failed to read rules directory: {}", e })
+        let entries = fs::read_dir(dir).map_err(|e| GhostError::Configuration {
+            message: format!("Failed to read rules directory: {}", e),
         })?;
 
         for entry in entries.flatten() {
@@ -225,7 +234,9 @@ impl DynamicYaraEngine {
         let rules = self
             .compiled_rules
             .as_ref()
-            .ok_or_else(|| GhostError::Configuration { message: "YARA rules not compiled".to_string( }))?;
+            .ok_or_else(|| GhostError::Configuration {
+                message: "YARA rules not compiled".to_string(),
+            })?;
 
         let mut all_matches = Vec::new();
         let mut bytes_scanned = 0u64;
@@ -287,12 +298,13 @@ impl DynamicYaraEngine {
         data: &[u8],
         base_address: usize,
     ) -> Result<Vec<RuleMatch>, GhostError> {
-        let mut scanner = Scanner::new(rules)
-            .map_err(|e| GhostError::Detection { message: format!("Scanner creation failed: {}", e }))?;
+        let mut scanner = Scanner::new(rules).map_err(|e| GhostError::Detection {
+            message: format!("Scanner creation failed: {}", e),
+        })?;
 
-        let scan_results = scanner
-            .scan_mem(data)
-            .map_err(|e| GhostError::Detection { message: format!("Scan failed: {}", e }))?;
+        let scan_results = scanner.scan_mem(data).map_err(|e| GhostError::Detection {
+            message: format!("Scan failed: {}", e),
+        })?;
 
         let mut matches = Vec::new();
 
@@ -349,8 +361,11 @@ impl DynamicYaraEngine {
         use windows::Win32::System::Threading::{OpenProcess, PROCESS_VM_READ};
 
         unsafe {
-            let handle = OpenProcess(PROCESS_VM_READ, false, pid)
-                .map_err(|e| GhostError::MemoryEnumeration { reason: format!("OpenProcess failed: {}", e }))?;
+            let handle = OpenProcess(PROCESS_VM_READ, false, pid).map_err(|e| {
+                GhostError::MemoryEnumeration {
+                    reason: format!("OpenProcess failed: {}", e),
+                }
+            })?;
 
             let mut buffer = vec![0u8; region.size];
             let mut bytes_read = 0;
@@ -383,16 +398,20 @@ impl DynamicYaraEngine {
         use std::io::{Read, Seek, SeekFrom};
 
         let mem_path = format!("/proc/{}/mem", pid);
-        let mut file = File::open(&mem_path).map_err(|e| {
-            GhostError::MemoryEnumeration { reason: format!("Failed to open {}: {}", mem_path, e })
+        let mut file = File::open(&mem_path).map_err(|e| GhostError::MemoryEnumeration {
+            reason: format!("Failed to open {}: {}", mem_path, e),
         })?;
 
         file.seek(SeekFrom::Start(region.base_address as u64))
-            .map_err(|e| GhostError::MemoryEnumeration { reason: format!("Seek failed: {}", e }))?;
+            .map_err(|e| GhostError::MemoryEnumeration {
+                reason: format!("Seek failed: {}", e),
+            })?;
 
         let mut buffer = vec![0u8; region.size];
         file.read_exact(&mut buffer)
-            .map_err(|e| GhostError::MemoryEnumeration { reason: format!("Read failed: {}", e }))?;
+            .map_err(|e| GhostError::MemoryEnumeration {
+                reason: format!("Read failed: {}", e),
+            })?;
 
         Ok(buffer)
     }
