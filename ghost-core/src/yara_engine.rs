@@ -179,13 +179,14 @@ impl DynamicYaraEngine {
             });
         }
 
-        self.compiled_rules = Some(
-            compiler
-                .compile_rules()
-                .map_err(|e| GhostError::Configuration {
-                    message: format!("Rule compilation failed: {}", e),
-                })?,
-        );
+        // Compile all the added rules
+        let compiled_rules = compiler
+            .compile_rules()
+            .map_err(|e| GhostError::Configuration {
+                message: format!("Rule compilation failed: {}", e),
+            })?;
+        
+        self.compiled_rules = Some(compiled_rules);
 
         log::info!("Successfully compiled {} YARA rules", rule_count);
         Ok(rule_count)
