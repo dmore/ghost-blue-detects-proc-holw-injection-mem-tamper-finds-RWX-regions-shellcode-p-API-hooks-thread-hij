@@ -154,11 +154,9 @@ impl DynamicYaraEngine {
             ));
         }
 
-        self.compiled_rules = Some(
-            compiler
-                .compile_rules()
-                .map_err(|e| GhostError::ConfigurationError(format!("Rule compilation failed: {}", e)))?,
-        );
+        self.compiled_rules = Some(compiler.compile_rules().map_err(|e| {
+            GhostError::ConfigurationError(format!("Rule compilation failed: {}", e))
+        })?);
 
         log::info!("Successfully compiled {} YARA rules", rule_count);
         Ok(rule_count)
@@ -202,9 +200,10 @@ impl DynamicYaraEngine {
     ) -> Result<YaraScanResult, GhostError> {
         let start_time = SystemTime::now();
 
-        let rules = self.compiled_rules.as_ref().ok_or_else(|| {
-            GhostError::ConfigurationError("YARA rules not compiled".to_string())
-        })?;
+        let rules = self
+            .compiled_rules
+            .as_ref()
+            .ok_or_else(|| GhostError::ConfigurationError("YARA rules not compiled".to_string()))?;
 
         let mut all_matches = Vec::new();
         let mut bytes_scanned = 0u64;
@@ -322,10 +321,7 @@ impl DynamicYaraEngine {
 
     /// Read memory from a specific process and region
     #[cfg(target_os = "windows")]
-    fn read_process_memory(
-        pid: u32,
-        region: &MemoryRegion,
-    ) -> Result<Vec<u8>, GhostError> {
+    fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         use windows::Win32::Foundation::{CloseHandle, HANDLE};
         use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
         use windows::Win32::System::Threading::{OpenProcess, PROCESS_VM_READ};
@@ -360,16 +356,14 @@ impl DynamicYaraEngine {
 
     /// Read memory from a specific process and region (Linux implementation)
     #[cfg(target_os = "linux")]
-    fn read_process_memory(
-        pid: u32,
-        region: &MemoryRegion,
-    ) -> Result<Vec<u8>, GhostError> {
+    fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
 
         let mem_path = format!("/proc/{}/mem", pid);
-        let mut file = File::open(&mem_path)
-            .map_err(|e| GhostError::MemoryReadError(format!("Failed to open {}: {}", mem_path, e)))?;
+        let mut file = File::open(&mem_path).map_err(|e| {
+            GhostError::MemoryReadError(format!("Failed to open {}: {}", mem_path, e))
+        })?;
 
         file.seek(SeekFrom::Start(region.base_address as u64))
             .map_err(|e| GhostError::MemoryReadError(format!("Seek failed: {}", e)))?;
@@ -383,10 +377,7 @@ impl DynamicYaraEngine {
 
     /// Read memory from a specific process and region (macOS implementation)
     #[cfg(target_os = "macos")]
-    fn read_process_memory(
-        _pid: u32,
-        _region: &MemoryRegion,
-    ) -> Result<Vec<u8>, GhostError> {
+    fn read_process_memory(_pid: u32, _region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         Err(GhostError::NotImplemented(
             "Memory reading not implemented for macOS".to_string(),
         ))

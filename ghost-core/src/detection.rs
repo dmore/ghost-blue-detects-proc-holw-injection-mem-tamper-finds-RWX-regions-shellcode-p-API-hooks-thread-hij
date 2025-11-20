@@ -262,20 +262,16 @@ impl DetectionEngine {
 
         // YARA rule scanning
         if let Some(yara_engine) = &self.yara_engine {
-            if let Ok(yara_result) =
-                tokio::runtime::Handle::try_current()
-                    .and_then(|handle| {
-                        handle.block_on(async {
-                            yara_engine.scan_process(process, memory_regions).await
-                        })
-                    })
-                    .or_else(|_| {
-                        tokio::runtime::Runtime::new()
-                            .unwrap()
-                            .block_on(async {
-                                yara_engine.scan_process(process, memory_regions).await
-                            })
-                    })
+            if let Ok(yara_result) = tokio::runtime::Handle::try_current()
+                .and_then(|handle| {
+                    handle
+                        .block_on(async { yara_engine.scan_process(process, memory_regions).await })
+                })
+                .or_else(|_| {
+                    tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(async { yara_engine.scan_process(process, memory_regions).await })
+                })
             {
                 if !yara_result.matches.is_empty() {
                     log::info!(

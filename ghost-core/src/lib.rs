@@ -110,6 +110,5 @@ pub use threat_intel::{
     ThreatContext, ThreatIntelligence,
 };
 pub use yara_engine::{
-    DynamicYaraEngine, RuleMatch, ThreatLevel as YaraThreatLevel, YaraRuleMetadata,
-    YaraScanResult,
+    DynamicYaraEngine, RuleMatch, ThreatLevel as YaraThreatLevel, YaraRuleMetadata, YaraScanResult,
 };
