@@ -712,7 +712,7 @@ impl EbpfDetector {
 
         let events = {
             let mut buffer = self.ring_buffer.lock().map_err(|e| {
-                EbpfError::RuntimeError(format!("Failed to lock ring buffer: {}", e))
+                EbpfError::EventProcessingError(format!("Failed to lock ring buffer: {}", e))
             })?;
             buffer.drain_events()
         };

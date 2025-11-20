@@ -341,7 +341,7 @@ impl DynamicYaraEngine {
                         offset: (base_address + m.offset) as u64,
                         length: m.length as u32,
                         metadata: metadata.clone(),
-                        matched_strings: vec![identifier],
+                        matched_strings: vec![identifier.clone()],
                     });
                 }
             }

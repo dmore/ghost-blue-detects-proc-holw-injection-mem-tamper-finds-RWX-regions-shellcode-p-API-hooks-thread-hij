@@ -266,12 +266,22 @@ impl DetectionEngine {
                 Ok(handle) => handle
                     .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
                 Err(_) => {
-                    let runtime =
-                        tokio::runtime::Runtime::new().map_err(|e| GhostError::Configuration {
-                            message: format!("Failed to create async runtime: {}", e),
-                        })?;
-                    runtime
-                        .block_on(async { yara_engine.scan_process(process, memory_regions).await })
+                    match tokio::runtime::Runtime::new() {
+                        Ok(runtime) => runtime
+                            .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
+                        Err(e) => {
+                            log::error!("Failed to create async runtime: {}", e);
+                            return DetectionResult {
+                                process: process.clone(),
+                                threat_level: ThreatLevel::Clean,
+                                indicators: vec!["YARA scan failed due to runtime error".to_string()],
+                                confidence: 0.0,
+                                threat_context: None,
+                                evasion_analysis: None,
+                                mitre_analysis: None,
+                            };
+                        }
+                    }
                 }
             };
 
