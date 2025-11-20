@@ -36,7 +36,7 @@ impl std::fmt::Debug for EbpfDetector {
 #[derive(Debug)]
 pub struct EbpfProgramManager {
     loaded_programs: HashMap<String, LoadedProgram>,
-    program_definitions: Vec<EbpfProgramDefinition>,
+    _program_definitions: Vec<EbpfProgramDefinition>,
 }
 
 #[cfg(target_os = "linux")]
@@ -78,8 +78,8 @@ pub struct EbpfProgramDefinition {
 #[cfg(target_os = "linux")]
 pub struct EbpfEventProcessor {
     event_handlers: HashMap<EventType, Box<dyn EventHandler>>,
-    detection_rules: Vec<EbpfDetectionRule>,
-    process_tracker: ProcessTracker,
+    _detection_rules: Vec<EbpfDetectionRule>,
+    _process_tracker: ProcessTracker,
 }
 
 #[cfg(target_os = "linux")]
@@ -391,9 +391,9 @@ pub enum NetworkPattern {
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub struct ProcessTracker {
-    processes: HashMap<u32, TrackedProcess>,
-    process_tree: HashMap<u32, Vec<u32>>,
-    injection_timeline: Vec<InjectionEvent>,
+    _processes: HashMap<u32, TrackedProcess>,
+    _process_tree: HashMap<u32, Vec<u32>>,
+    _injection_timeline: Vec<InjectionEvent>,
 }
 
 #[cfg(target_os = "linux")]
@@ -446,7 +446,7 @@ pub enum IndicatorType {
 #[derive(Debug)]
 pub struct EbpfFilterManager {
     active_filters: HashMap<String, EbpfFilter>,
-    filter_statistics: HashMap<String, FilterStats>,
+    _filter_statistics: HashMap<String, FilterStats>,
 }
 
 #[cfg(target_os = "linux")]
@@ -498,11 +498,11 @@ pub struct FilterStats {
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub struct EbpfRingBuffer {
-    buffer: Vec<EbpfEvent>,
-    read_index: usize,
-    write_index: usize,
-    capacity: usize,
-    lost_events: u64,
+    _buffer: Vec<EbpfEvent>,
+    _read_index: usize,
+    _write_index: usize,
+    _capacity: usize,
+    _lost_events: u64,
 }
 
 #[cfg(target_os = "linux")]
@@ -809,6 +809,13 @@ pub enum EbpfError {
 pub struct ProcessCreateHandler;
 
 #[cfg(target_os = "linux")]
+impl Default for ProcessCreateHandler {
+    fn default() -> Self {
+        Self
+    }
+}
+
+#[cfg(target_os = "linux")]
 impl ProcessCreateHandler {
     pub fn new() -> Self {
         Self
@@ -829,6 +836,13 @@ impl EventHandler for ProcessCreateHandler {
 
 #[cfg(target_os = "linux")]
 pub struct MemoryMapHandler;
+
+#[cfg(target_os = "linux")]
+impl Default for MemoryMapHandler {
+    fn default() -> Self {
+        Self
+    }
+}
 
 #[cfg(target_os = "linux")]
 impl MemoryMapHandler {
@@ -853,6 +867,13 @@ impl EventHandler for MemoryMapHandler {
 pub struct MemoryProtectHandler;
 
 #[cfg(target_os = "linux")]
+impl Default for MemoryProtectHandler {
+    fn default() -> Self {
+        Self
+    }
+}
+
+#[cfg(target_os = "linux")]
 impl MemoryProtectHandler {
     pub fn new() -> Self {
         Self
@@ -873,6 +894,13 @@ impl EventHandler for MemoryProtectHandler {
 
 #[cfg(target_os = "linux")]
 pub struct InjectionHandler;
+
+#[cfg(target_os = "linux")]
+impl Default for InjectionHandler {
+    fn default() -> Self {
+        Self
+    }
+}
 
 #[cfg(target_os = "linux")]
 impl InjectionHandler {
@@ -899,7 +927,7 @@ impl EbpfProgramManager {
     pub fn new() -> Result<Self, EbpfError> {
         Ok(Self {
             loaded_programs: HashMap::new(),
-            program_definitions: Vec::new(),
+            _program_definitions: Vec::new(),
         })
     }
 
@@ -911,12 +939,19 @@ impl EbpfProgramManager {
 }
 
 #[cfg(target_os = "linux")]
+impl Default for EbpfEventProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(target_os = "linux")]
 impl EbpfEventProcessor {
     pub fn new() -> Self {
         Self {
             event_handlers: HashMap::new(),
-            detection_rules: Vec::new(),
-            process_tracker: ProcessTracker::new(),
+            _detection_rules: Vec::new(),
+            _process_tracker: ProcessTracker::new(),
         }
     }
 
@@ -931,13 +966,27 @@ impl EbpfEventProcessor {
 }
 
 #[cfg(target_os = "linux")]
+impl Default for ProcessTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(target_os = "linux")]
 impl ProcessTracker {
     pub fn new() -> Self {
         Self {
-            processes: HashMap::new(),
-            process_tree: HashMap::new(),
-            injection_timeline: Vec::new(),
+            _processes: HashMap::new(),
+            _process_tree: HashMap::new(),
+            _injection_timeline: Vec::new(),
         }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Default for EbpfFilterManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -946,7 +995,7 @@ impl EbpfFilterManager {
     pub fn new() -> Self {
         Self {
             active_filters: HashMap::new(),
-            filter_statistics: HashMap::new(),
+            _filter_statistics: HashMap::new(),
         }
     }
 
@@ -964,11 +1013,11 @@ impl EbpfFilterManager {
 impl EbpfRingBuffer {
     pub fn new(capacity: usize) -> Self {
         Self {
-            buffer: Vec::with_capacity(capacity),
-            read_index: 0,
-            write_index: 0,
-            capacity,
-            lost_events: 0,
+            _buffer: Vec::with_capacity(capacity),
+            _read_index: 0,
+            _write_index: 0,
+            _capacity: capacity,
+            _lost_events: 0,
         }
     }
 
