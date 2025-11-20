@@ -73,10 +73,9 @@ pub struct HookDetectionResult {
 mod platform {
     use super::{HookDetectionResult, HookInfo, HookType};
     use crate::{GhostError, Result};
-    use std::collections::HashMap;
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
-    use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress, LoadLibraryW};
+    use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
     use windows::Win32::System::ProcessStatus::{
         EnumProcessModulesEx, GetModuleBaseNameW, GetModuleInformation, LIST_MODULES_ALL,
         MODULEINFO,
@@ -111,7 +110,6 @@ mod platform {
     pub fn detect_hook_injection(target_pid: u32) -> Result<HookDetectionResult> {
         let mut hooks = Vec::new();
         let mut suspicious_count = 0;
-        let mut global_hooks = 0;
         let mut inline_hooks = 0;
 
         // Detect inline hooks in critical APIs

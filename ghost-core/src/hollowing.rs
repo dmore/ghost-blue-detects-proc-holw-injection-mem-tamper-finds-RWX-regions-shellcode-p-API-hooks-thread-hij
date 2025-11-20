@@ -1,7 +1,7 @@
 use crate::{MemoryRegion, ProcessInfo, Result};
 
 #[cfg(windows)]
-use crate::memory::{read_pe_header_info, validate_pe_header, PEHeaderValidation};
+use crate::memory::{validate_pe_header, PEHeaderValidation};
 
 #[derive(Debug, Clone)]
 pub struct HollowingDetection {
