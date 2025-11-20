@@ -128,6 +128,17 @@ mod platform {
             }
         }
 
+        // Detect IAT hooks
+        match detect_iat_hooks_for_process(target_pid) {
+            Ok(iat_hooks) => {
+                suspicious_count += iat_hooks.len();
+                hooks.extend(iat_hooks);
+            }
+            Err(e) => {
+                log::debug!("Failed to detect IAT hooks: {}", e);
+            }
+        }
+
         // Estimate global hooks based on system state
         let global_hooks = estimate_global_hooks();
         if global_hooks > 10 {
@@ -327,6 +338,150 @@ mod platform {
         // by parsing USER32.dll's internal structures.
         // Return typical value for now.
         3
+    }
+
+    /// Detect IAT hooks in loaded modules
+    fn detect_iat_hooks_for_process(target_pid: u32) -> Result<Vec<HookInfo>> {
+        let mut hooks = Vec::new();
+
+        unsafe {
+            let handle = OpenProcess(
+                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                false,
+                target_pid,
+            )
+            .map_err(|e| GhostError::Detection {
+                message: format!("Failed to open process for IAT scan: {}", e),
+            })?;
+
+            // Get loaded modules
+            let mut modules = [windows::Win32::Foundation::HMODULE::default(); 1024];
+            let mut cb_needed = 0u32;
+
+            if EnumProcessModulesEx(
+                handle,
+                modules.as_mut_ptr(),
+                (modules.len() * std::mem::size_of::<windows::Win32::Foundation::HMODULE>()) as u32,
+                &mut cb_needed,
+                LIST_MODULES_ALL,
+            )
+            .is_err()
+            {
+                let _ = CloseHandle(handle);
+                return Ok(hooks);
+            }
+
+            let module_count =
+                (cb_needed as usize) / std::mem::size_of::<windows::Win32::Foundation::HMODULE>();
+
+            // Check IAT for each module
+            for module in modules.iter().take(module_count) {
+                let mut mod_info = MODULEINFO::default();
+                if GetModuleInformation(
+                    handle,
+                    *module,
+                    &mut mod_info,
+                    std::mem::size_of::<MODULEINFO>() as u32,
+                )
+                .is_err()
+                {
+                    continue;
+                }
+
+                let base_address = mod_info.lpBaseOfDll as usize;
+
+                // Get module filename for disk comparison
+                let mut name_buffer = [0u16; 1024];
+                if GetModuleBaseNameW(handle, *module, &mut name_buffer) == 0 {
+                    continue;
+                }
+
+                let module_name = String::from_utf16_lossy(
+                    &name_buffer[..name_buffer
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(name_buffer.len())],
+                );
+
+                // Create memory reader closure
+                let memory_reader = |pid: u32, addr: usize, size: usize| -> Result<Vec<u8>> {
+                    let handle = OpenProcess(PROCESS_VM_READ, false, pid)
+                        .map_err(|e| GhostError::MemoryReadError(format!("OpenProcess failed: {}", e)))?;
+
+                    let mut buffer = vec![0u8; size];
+                    let mut bytes_read = 0usize;
+
+                    let result = ReadProcessMemory(
+                        handle,
+                        addr as *const _,
+                        buffer.as_mut_ptr() as *mut _,
+                        size,
+                        Some(&mut bytes_read),
+                    );
+
+                    let _ = CloseHandle(handle);
+
+                    if result.is_ok() && bytes_read > 0 {
+                        buffer.truncate(bytes_read);
+                        Ok(buffer)
+                    } else {
+                        Err(GhostError::MemoryReadError("ReadProcessMemory failed".to_string()))
+                    }
+                };
+
+                // Try to find the module file on disk
+                let system32 = std::env::var("SystemRoot")
+                    .unwrap_or_else(|_| "C:\\Windows".to_string())
+                    + "\\System32\\";
+
+                let possible_paths = vec![
+                    system32.clone() + &module_name,
+                    format!("C:\\Windows\\SysWOW64\\{}", module_name),
+                ];
+
+                for disk_path in possible_paths {
+                    if std::path::Path::new(&disk_path).exists() {
+                        match crate::pe_parser::detect_iat_hooks(
+                            target_pid,
+                            base_address,
+                            &disk_path,
+                            memory_reader,
+                        ) {
+                            Ok(iat_result) => {
+                                log::info!(
+                                    "IAT scan for {}: {}/{} imports hooked ({:.1}%)",
+                                    module_name,
+                                    iat_result.hooked_imports.len(),
+                                    iat_result.total_imports,
+                                    iat_result.hook_percentage
+                                );
+
+                                for hooked_import in iat_result.hooked_imports {
+                                    hooks.push(HookInfo {
+                                        hook_type: HookType::IATHook,
+                                        thread_id: 0,
+                                        hook_proc: hooked_import.current_address,
+                                        original_address: hooked_import.iat_address,
+                                        module_name: hooked_import.dll_name.clone(),
+                                        hooked_function: hooked_import
+                                            .function_name
+                                            .unwrap_or_else(|| format!("Ordinal_{}", hooked_import.ordinal.unwrap_or(0))),
+                                    });
+                                }
+                                break;
+                            }
+                            Err(e) => {
+                                log::debug!("IAT scan failed for {}: {:?}", module_name, e);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let _ = CloseHandle(handle);
+        }
+
+        Ok(hooks)
     }
 
     /// Get hook type name for display.
