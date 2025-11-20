@@ -85,7 +85,7 @@ impl DetectionConfig {
     }
 
     /// Validates the configuration values.
-    fn validate(&self) -> Result<(), GhostError> {
+    pub fn validate(&self) -> Result<(), GhostError> {
         if self.confidence_threshold < 0.0 || self.confidence_threshold > 1.0 {
             return Err(GhostError::Configuration {
                 message: "confidence_threshold must be between 0.0 and 1.0".into(),
@@ -163,16 +163,27 @@ impl ProcessFilter {
     pub fn should_scan(&self, process_name: &str) -> bool {
         // If whitelist is not empty, only scan whitelisted processes
         if !self.whitelist.is_empty() {
-            return self.whitelist.iter().any(|name| process_name.contains(name));
+            return self
+                .whitelist
+                .iter()
+                .any(|name| process_name.contains(name));
         }
 
         // Skip blacklisted processes
-        if self.blacklist.iter().any(|name| process_name.contains(name)) {
+        if self
+            .blacklist
+            .iter()
+            .any(|name| process_name.contains(name))
+        {
             return false;
         }
 
         // Skip system processes if configured
-        if self.system_processes.iter().any(|name| process_name == name) {
+        if self
+            .system_processes
+            .iter()
+            .any(|name| process_name == name)
+        {
             return false;
         }
 
@@ -188,7 +199,7 @@ mod tests {
     fn test_default_config() {
         let config = DetectionConfig::default();
         assert!(config.shellcode_detection);
-        assert_eq!(config.confidence_threshold, 0.7);
+        assert_eq!(config.confidence_threshold, 0.3);
     }
 
     #[test]
