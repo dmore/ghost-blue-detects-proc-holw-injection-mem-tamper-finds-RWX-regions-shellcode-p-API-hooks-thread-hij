@@ -1,142 +1,66 @@
 # Ghost
 
-Cross-platform process injection detection framework written in Rust.
+Ghost is a process injection detection tool written in Rust. It watches running processes and tries to catch suspicious stuff like code injection, memory manipulation, and other tricks that malware uses to hide.
 
-## Overview
+## What it does
 
-Ghost is a security framework for detecting process injection, memory manipulation, and suspicious process behavior. It provides memory analysis, behavioral monitoring, and MITRE ATT&CK technique mapping for security research and defensive purposes.
+The main idea is simple: scan processes and look for weird memory patterns, hooked functions, shellcode, and other signs that something's been tampered with. It works on Windows, Linux, and macOS (though Windows support is the most complete right now).
 
-## Features
+Some of the things it can detect:
 
-- **Memory Analysis**: RWX region detection, shellcode pattern scanning, memory protection analysis
-- **MITRE ATT&CK Mapping**: Technique identification using the ATT&CK framework
-- **Cross-platform Support**:
-  - **Windows**: Process enumeration, memory reading (ReadProcessMemory), thread analysis (NtQueryInformationThread), inline hook detection, PE header validation
-  - **Linux**: Process enumeration via procfs, memory region analysis (/proc/[pid]/maps), thread state monitoring, LD_PRELOAD detection, ptrace detection
-  - **macOS**: Process enumeration via sysctl/KERN_PROC_ALL
-- **Real-time Monitoring**: Continuous scanning with configurable intervals
-- **Threat Intelligence**: IOC storage and correlation framework
+- **Memory regions with read-write-execute permissions** - Usually a red flag
+- **Shellcode patterns** - Common instruction sequences found in injected code
+- **Process hollowing** - When a legit process gets gutted and replaced with malicious code
+- **API hooks** - Functions that have been redirected by inline patches or IAT modifications
+- **Thread hijacking** - Threads that are redirected to execute shellcode
+- **APC injection** - Malicious code queued via Asynchronous Procedure Calls
+- **YARA signatures** - Matches against known malware patterns and payloads
 
-## Architecture
+It also maps detected behaviors to the MITRE ATT&CK framework, which is helpful if you're documenting threats or writing reports.
 
-```
-ghost/
-├── ghost-core/     # Core detection engine and platform abstractions
-├── ghost-cli/      # Command-line interface
-├── ghost-tui/      # Interactive terminal UI (Ratatui-based)
-├── examples/       # Configuration examples
-└── docs/           # Technical documentation
-```
+## Building it
 
-### Core Modules
-
-- **Detection Engine** ([detection.rs](ghost-core/src/detection.rs)): Orchestrates analysis and threat scoring
-- **Memory Analysis** ([memory.rs](ghost-core/src/memory.rs)): Platform-specific memory enumeration and reading
-- **Process Enumeration** ([process.rs](ghost-core/src/process.rs)): Cross-platform process listing
-- **Thread Analysis** ([thread.rs](ghost-core/src/thread.rs)): Thread enumeration with start address and creation time
-- **Hook Detection** ([hooks.rs](ghost-core/src/hooks.rs)): Inline hook detection via JMP pattern analysis
-- **MITRE ATT&CK** ([mitre.rs](ghost-core/src/mitre.rs)): Technique mapping and categorization
-- **Configuration** ([config.rs](ghost-core/src/config.rs)): TOML-based configuration with validation
-
-## Supported Detection Techniques
-
-### Process Injection (T1055)
-- RWX memory region detection
-- Private executable memory analysis
-- Thread count anomaly detection
-- Inline hook detection (JMP patches on ntdll.dll, kernel32.dll, user32.dll)
-- LD_PRELOAD and LD_LIBRARY_PATH detection (Linux)
-- Ptrace injection detection (Linux)
-- SetWindowsHookEx hook enumeration
-- Thread hijacking indicators (T1055.003)
-- Process hollowing detection with PE header validation (T1055.012)
-
-### Memory Analysis
-- Memory protection flags (R/W/X combinations)
-- Region type classification (IMAGE, PRIVATE, MAPPED, HEAP, STACK)
-- Small executable region detection (shellcode indicators)
-- Memory region size anomalies
-
-### Behavioral Monitoring
-- Thread count changes from baseline
-- New thread creation detection
-- Process parent-child relationships
-- System process identification
-
-## Installation
-
-### Requirements
-
-- Rust 1.70+ (stable)
-- Platform-specific dependencies:
-  - **Windows**: MSVC Build Tools, Windows SDK
-  - **Linux**: GCC/Clang, libelf-dev (for eBPF)
-  - **macOS**: Xcode Command Line Tools
-
-### Building
+You'll need Rust installed (1.70 or newer). Then:
 
 ```bash
-# Release build (recommended)
 cargo build --release
-
-# Development build
-cargo build
-
-# Run tests
-cargo test
-
-# Generate documentation
-cargo doc --open
 ```
 
-## Usage
+On Windows, you'll also need the MSVC build tools. Linux needs basic dev tools (gcc, etc.). macOS needs Xcode command line tools.
 
-### CLI
+## Running it
+
+There are two interfaces: a command-line tool and an interactive terminal UI.
+
+**CLI:**
 
 ```bash
-# Basic scan
-cargo run --bin ghost-cli
+# Scan all processes
+cargo run --bin ghost-cli --release
 
-# Target specific process
-cargo run --bin ghost-cli -- --pid 1234
+# Target one process
+cargo run --bin ghost-cli --release -- --pid 1234
 
-# JSON output
-cargo run --bin ghost-cli -- --format json
+# Output results as JSON
+cargo run --bin ghost-cli --release -- --format json
 
-# Load custom configuration
-cargo run --bin ghost-cli -- --config examples/ghost.toml
-
-# Show MITRE ATT&CK statistics
-cargo run --bin ghost-cli -- --mitre-stats
-
-# Verbose output with debug logging
-cargo run --bin ghost-cli -- -v -d
+# Use a config file
+cargo run --bin ghost-cli --release -- --config ghost.toml
 ```
 
-### TUI (Terminal User Interface)
+**TUI:**
 
 ```bash
-cargo run --bin ghost-tui
+cargo run --bin ghost-tui --release
 ```
 
-The TUI provides:
-- Real-time process monitoring dashboard
-- Detection history with threat levels
-- System statistics and performance metrics
-- Interactive process exploration
-- Live system logs
+The TUI gives you a dashboard with live stats, detection history, and you can navigate around with keyboard shortcuts (Tab to switch views, Q to quit).
 
-**Keyboard Controls:**
-- `Tab`: Switch between views
-- `Up/Down`: Navigate lists
-- `Enter`: Select item
-- `R`: Force refresh
-- `C`: Clear history
-- `Q`: Quit
+## Configuration
 
-### Configuration
+You can tweak behavior with a TOML config file. Check `examples/ghost.toml` for a starting point. You can enable/disable specific detection methods, set confidence thresholds, skip system processes, and control how often it scans.
 
-Create a configuration file (see `examples/ghost.toml`):
+Example config snippet:
 
 ```toml
 shellcode_detection = true
@@ -144,77 +68,61 @@ hollowing_detection = true
 hook_detection = true
 confidence_threshold = 0.3
 skip_system_processes = true
-max_memory_scan_size = 104857600  # 100MB
-thread_analysis_enabled = true
-evasion_detection = true
-mitre_mapping = true
 scan_interval_ms = 2000
 ```
 
-## Exit Codes
+## What the results mean
 
-- `0`: Clean scan, no suspicious activity
-- `1`: Suspicious processes found
-- `2`: Error occurred during scanning
+When Ghost finds something suspicious, it assigns a threat level: Clean, Low, Medium, High, or Critical. This is based on how many indicators it found and how serious they are.
+
+High confidence doesn't always mean malware - some legit software does weird stuff with memory too. Use your judgment and investigate further if needed.
+
+## Platform differences
+
+**Windows:** Pretty much everything works. Process enumeration, memory reading, hook detection, PE validation, etc.
+
+**Linux:** Works but relies on procfs (`/proc`). Can detect LD_PRELOAD shenanigans and ptrace-based injection. eBPF support is stubbed out for now.
+
+**macOS:** Basic process enumeration works. Memory reading is implemented but not as feature-complete as Windows. Some detection methods don't apply or aren't implemented yet.
 
 ## Performance
 
-Ghost is designed for low-overhead monitoring:
-- Memory enumeration: <100ms per process
-- Thread analysis: <50ms per process
-- Detection engine: <10ms per analysis
-- Full system scan: <5s for 200 processes
+It's designed to be fast enough for continuous monitoring. A full system scan (200 processes) usually takes under 5 seconds. Memory enumeration per process is around 50-100ms. The detection engine itself adds about 5-10ms per analysis.
+
+## YARA rules
+
+The tool includes YARA rule integration. Rules are stored in the `rules/` directory and cover common malware families like Metasploit, Cobalt Strike, generic shellcode patterns, and evasion techniques. You can add your own rules - just drop `.yar` files in that folder.
+
+## Exit codes
+
+- 0 = Everything looks clean
+- 1 = Found suspicious processes
+- 2 = Something went wrong (error during scan)
+
+## Limitations
+
+This is a userspace tool. It can't see kernel-level manipulation without help (like a driver on Windows or eBPF on Linux - which isn't fully implemented yet).
+
+Some legit programs will trigger false positives. For example, game anti-cheat software, debuggers, sandboxes, and even browsers with JIT compilers can show up as suspicious because they do memory tricks.
+
+macOS support is limited compared to Windows. Some advanced features just aren't there yet because the APIs are different and less documented.
 
 ## Documentation
 
-- [Detection Methods](docs/DETECTION_METHODS.md)
-- [MITRE ATT&CK Coverage](docs/MITRE_ATTACK_COVERAGE.md)
-- [Performance Guide](docs/PERFORMANCE_GUIDE.md)
-- [Research Framework](docs/RESEARCH_FRAMEWORK.md)
-- [Build Instructions](BUILD.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Security Policy](SECURITY.md)
+There's more detail in the `docs/` folder:
+
+- `DETECTION_METHODS.md` - Explains how each detection technique works
+- `MITRE_ATTACK_COVERAGE.md` - Lists which ATT&CK techniques are covered
+- `PERFORMANCE_GUIDE.md` - Tips for tuning performance
+
+Also check out `CONTRIBUTING.md` if you want to contribute, and `SECURITY.md` for the security policy.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT. See the LICENSE file.
 
-## Contributing
+## A note on usage
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
-- Code style (rustfmt, clippy)
-- Performance requirements
-- Testing standards
-- Pull request process
+This tool is for security research, testing your own systems, and catching actual threats. Don't use it on systems you don't own or don't have permission to test. Be responsible.
 
-## Security
-
-Please review [SECURITY.md](SECURITY.md) for:
-- Responsible disclosure policy
-- Security considerations
-- Threat model
-
-## Platform Support Matrix
-
-| Feature | Windows | Linux | macOS |
-|---------|---------|-------|-------|
-| Process Enumeration | CreateToolhelp32Snapshot | /proc filesystem | sysctl KERN_PROC_ALL |
-| Memory Enumeration | VirtualQueryEx | /proc/[pid]/maps | Not implemented |
-| Memory Reading | ReadProcessMemory | /proc/[pid]/mem | Not implemented |
-| Thread Enumeration | Thread32First/Next | /proc/[pid]/task | Not implemented |
-| Thread Start Address | NtQueryInformationThread | /proc/[pid]/task/[tid]/syscall | Not implemented |
-| Thread Creation Time | GetThreadTimes | /proc/[pid]/task/[tid]/stat | Not implemented |
-| Hook Detection | Inline JMP pattern scanning | LD_PRELOAD/ptrace detection | Not applicable |
-| PE Header Validation | Full PE validation | Not applicable | Not applicable |
-| Process Path | GetProcessImageFileNameW | /proc/[pid]/exe | proc_pidpath |
-
-## Status
-
-Active development. Core detection engine functional with cross-platform abstractions. Windows support most complete. Linux support via procfs. macOS has process enumeration but limited memory/thread analysis.
-
-### Known Limitations
-
-- macOS memory enumeration and reading not yet implemented (requires vm_read and mach_vm_region)
-- Windows SetWindowsHookEx chain enumeration requires parsing undocumented USER32.dll structures
-- Shellcode pattern matching currently uses heuristics (no actual signature database)
-- No kernel-level monitoring (all userspace APIs)
+Also, if you're investigating a real incident, remember that malware can detect when it's being analyzed and might behave differently or shut down. Ghost tries to be stealthy but there's no guarantee advanced malware won't notice.
