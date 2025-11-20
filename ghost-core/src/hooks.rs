@@ -129,7 +129,7 @@ mod platform {
         }
 
         // Estimate global hooks based on system state
-        global_hooks = estimate_global_hooks();
+        let global_hooks = estimate_global_hooks();
         if global_hooks > 10 {
             suspicious_count += 1;
         }
@@ -332,21 +332,21 @@ mod platform {
     /// Get hook type name for display.
     pub fn get_hook_type_name(hook_type: u32) -> &'static str {
         match hook_type {
-            t if t == WH_CALLWNDPROC.0 => "WH_CALLWNDPROC",
-            t if t == WH_CALLWNDPROCRET.0 => "WH_CALLWNDPROCRET",
-            t if t == WH_CBT.0 => "WH_CBT",
-            t if t == WH_DEBUG.0 => "WH_DEBUG",
-            t if t == WH_FOREGROUNDIDLE.0 => "WH_FOREGROUNDIDLE",
-            t if t == WH_GETMESSAGE.0 => "WH_GETMESSAGE",
-            t if t == WH_JOURNALPLAYBACK.0 => "WH_JOURNALPLAYBACK",
-            t if t == WH_JOURNALRECORD.0 => "WH_JOURNALRECORD",
-            t if t == WH_KEYBOARD.0 => "WH_KEYBOARD",
-            t if t == WH_KEYBOARD_LL.0 => "WH_KEYBOARD_LL",
-            t if t == WH_MOUSE.0 => "WH_MOUSE",
-            t if t == WH_MOUSE_LL.0 => "WH_MOUSE_LL",
-            t if t == WH_MSGFILTER.0 => "WH_MSGFILTER",
-            t if t == WH_SHELL.0 => "WH_SHELL",
-            t if t == WH_SYSMSGFILTER.0 => "WH_SYSMSGFILTER",
+            t if t == WH_CALLWNDPROC.0 as u32 => "WH_CALLWNDPROC",
+            t if t == WH_CALLWNDPROCRET.0 as u32 => "WH_CALLWNDPROCRET",
+            t if t == WH_CBT.0 as u32 => "WH_CBT",
+            t if t == WH_DEBUG.0 as u32 => "WH_DEBUG",
+            t if t == WH_FOREGROUNDIDLE.0 as u32 => "WH_FOREGROUNDIDLE",
+            t if t == WH_GETMESSAGE.0 as u32 => "WH_GETMESSAGE",
+            t if t == WH_JOURNALPLAYBACK.0 as u32 => "WH_JOURNALPLAYBACK",
+            t if t == WH_JOURNALRECORD.0 as u32 => "WH_JOURNALRECORD",
+            t if t == WH_KEYBOARD.0 as u32 => "WH_KEYBOARD",
+            t if t == WH_KEYBOARD_LL.0 as u32 => "WH_KEYBOARD_LL",
+            t if t == WH_MOUSE.0 as u32 => "WH_MOUSE",
+            t if t == WH_MOUSE_LL.0 as u32 => "WH_MOUSE_LL",
+            t if t == WH_MSGFILTER.0 as u32 => "WH_MSGFILTER",
+            t if t == WH_SHELL.0 as u32 => "WH_SHELL",
+            t if t == WH_SYSMSGFILTER.0 as u32 => "WH_SYSMSGFILTER",
             _ => "UNKNOWN",
         }
     }
