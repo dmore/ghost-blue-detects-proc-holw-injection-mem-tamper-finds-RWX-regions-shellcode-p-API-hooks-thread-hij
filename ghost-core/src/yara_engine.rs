@@ -119,7 +119,7 @@ impl DynamicYaraEngine {
     /// Compile all YARA rules from the rules directory
     pub fn compile_rules(&mut self) -> Result<usize, GhostError> {
         let rules_dir = self.rules_path.as_ref().ok_or_else(|| {
-            GhostError::Configuration { message: "No rules directory configured".to_string( })
+            GhostError::Configuration { message: "No rules directory configured".to_string() }
         })?;
 
         if !rules_dir.exists() {
@@ -130,7 +130,7 @@ impl DynamicYaraEngine {
         }
 
         let mut compiler = Compiler::new()
-            .map_err(|e| GhostError::Configuration { message: format!("YARA compiler error: {}", e }))?;
+            .map_err(|e| GhostError::Configuration { message: format!("YARA compiler error: {}", e) })?;
 
         let mut rule_count = 0;
         self.rule_metadata.clear();
