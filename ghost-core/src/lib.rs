@@ -63,6 +63,7 @@ pub mod memory;
 pub mod mitre_attack;
 pub mod ml_cloud;
 pub mod neural_memory;
+pub mod pe_parser;
 pub mod process;
 pub mod shellcode;
 pub mod streaming;
@@ -98,6 +99,7 @@ pub use neural_memory::{
     DetectedEvasion, DetectedPattern, EvasionCategory, MemoryAnomaly, NeuralAnalysisResult,
     NeuralInsights, NeuralMemoryAnalyzer, PatternType, PolymorphicIndicator,
 };
+pub use pe_parser::{ExportEntry, IATHookResult, ImportEntry};
 pub use process::ProcessInfo;
 pub use shellcode::{ShellcodeDetection, ShellcodeDetector};
 pub use streaming::{
