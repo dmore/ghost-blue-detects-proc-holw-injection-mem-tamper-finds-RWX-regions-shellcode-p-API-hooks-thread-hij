@@ -6,84 +6,40 @@
 | ------- | ------------------ |
 | 0.1.x   | :white_check_mark: |
 
-## Reporting a Vulnerability
+## Authorized Use
 
-We take security vulnerabilities seriously. If you discover a security issue in Ghost, please follow these steps:
+Ghost is designed for:
+- Authorized security testing
+- Defensive security operations  
+- CTF challenges
+- Security research and education
 
-### For Security Researchers
+## Reporting Vulnerabilities
 
-1. **DO NOT** create a public GitHub issue for security vulnerabilities
-2. Include detailed information about the vulnerability:
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
-   - Your contact information
+**Do NOT** open public issues for security vulnerabilities.
+
+Contact: Create a private security advisory on GitHub
 
 ### Response Timeline
 
-- **Initial Response**: Within 48 hours
-- **Assessment**: Within 7 days
-- **Fix Timeline**: Varies based on severity
-  - Critical: Within 7 days
-  - High: Within 14 days
-  - Medium: Within 30 days
-  - Low: Next release cycle
+- Acknowledgment: 48 hours
+- Initial assessment: 1 week
+- Critical fixes: 7 days
+- High priority: 30 days
 
-### Disclosure Policy
+## Security Best Practices
 
-We follow responsible disclosure practices:
+- Test only in authorized environments
+- Run with minimum privileges
+- Keep Ghost updated
+- Sanitize logs before sharing
+- Follow responsible disclosure
 
-1. Security researcher reports vulnerability privately
-2. We acknowledge receipt and begin investigation
-3. We develop and test a fix
-4. We prepare a security advisory
-5. We release the fix and publish the advisory
-6. Public disclosure after 90 days (or sooner if fix is available)
+## Known Limitations
 
-### Security Best Practices for Users
+- Advanced malware may evade detection
+- Kernel rootkits not detectable
+- Platform-specific limitations
+- Performance overhead on production systems
 
-1. **Keep Ghost Updated**: Always use the latest version
-2. **Run with Minimal Privileges**: Don't run as Administrator unless necessary
-3. **Validate Detection Results**: Ghost is a tool to assist analysis, not replace human judgment
-4. **Secure Your Environment**: Ensure your analysis environment is properly isolated
-
-### Known Security Considerations
-
-1. **Memory Access**: Ghost requires elevated privileges to read process memory
-2. **False Positives**: Detection engines may flag legitimate software
-3. **Evasion**: Advanced malware may evade detection techniques
-4. **Performance Impact**: Intensive scanning may affect system performance
-
-### Security Features
-
-- Memory-safe Rust implementation
-- Input validation on all API boundaries
-- Minimal attack surface design
-- No network communication by default
-- Comprehensive error handling
-
-### Vulnerability Categories We're Interested In
-
-**High Priority:**
-
-- Memory safety violations
-- Privilege escalation
-- Code injection vulnerabilities
-- Authentication bypass
-- Sensitive data exposure
-
-**Medium Priority:**
-
-- Denial of service
-- Information disclosure
-- Logic flaws in detection algorithms
-
-**Out of Scope:**
-
-- Issues requiring physical access
-- Social engineering attacks
-- Third-party dependency vulnerabilities (unless exploitable through Ghost)
-
----
-
-*Last updated: November 2025*
+Thank you for helping keep Ghost secure!
