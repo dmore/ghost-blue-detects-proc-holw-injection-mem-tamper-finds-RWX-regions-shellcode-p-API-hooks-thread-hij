@@ -711,7 +711,9 @@ impl EbpfDetector {
         let mut detection_events = Vec::new();
 
         let events = {
-            let mut buffer = self.ring_buffer.lock().unwrap();
+            let mut buffer = self.ring_buffer.lock().map_err(|e| {
+                EbpfError::RuntimeError(format!("Failed to lock ring buffer: {}", e))
+            })?;
             buffer.drain_events()
         };
 

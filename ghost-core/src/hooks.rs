@@ -237,12 +237,10 @@ mod platform {
 
                     let func_addr = match GetProcAddress(
                         local_module,
-                        windows::core::PCSTR::from_raw(
-                            std::ffi::CString::new(*func_name)
-                                .unwrap()
-                                .as_bytes_with_nul()
-                                .as_ptr(),
-                        ),
+                        windows::core::PCSTR::from_raw(match std::ffi::CString::new(*func_name) {
+                            Ok(cstring) => cstring.as_bytes_with_nul().as_ptr(),
+                            Err(_) => continue,
+                        }),
                     ) {
                         Some(addr) => addr as usize,
                         None => continue,

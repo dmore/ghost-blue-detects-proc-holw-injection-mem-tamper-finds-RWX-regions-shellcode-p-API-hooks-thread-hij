@@ -618,7 +618,10 @@ impl EventStreamingSystem {
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Add to event buffer for correlation
         {
-            let mut buffer = self.event_buffer.lock().unwrap();
+            let mut buffer = self
+                .event_buffer
+                .lock()
+                .map_err(|e| format!("Failed to lock event buffer: {}", e))?;
             buffer.add_event(event.clone());
         }
 

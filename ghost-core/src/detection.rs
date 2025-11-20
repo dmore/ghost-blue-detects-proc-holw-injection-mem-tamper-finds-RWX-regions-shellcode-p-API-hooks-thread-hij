@@ -265,9 +265,14 @@ impl DetectionEngine {
             let yara_result = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle
                     .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
-                Err(_) => tokio::runtime::Runtime::new()
-                    .unwrap()
-                    .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
+                Err(_) => {
+                    let runtime =
+                        tokio::runtime::Runtime::new().map_err(|e| GhostError::Configuration {
+                            message: format!("Failed to create async runtime: {}", e),
+                        })?;
+                    runtime
+                        .block_on(async { yara_engine.scan_process(process, memory_regions).await })
+                }
             };
 
             if let Ok(yara_result) = yara_result {
@@ -676,6 +681,10 @@ impl DetectionEngine {
 
 impl Default for DetectionEngine {
     fn default() -> Self {
-        Self::new().expect("Failed to create default DetectionEngine")
+        // For Default trait, we need to provide a working instance.
+        // If this fails, we'll have to panic as Default cannot return Error.
+        Self::new().unwrap_or_else(|e| {
+            panic!("Failed to create default DetectionEngine: {}", e);
+        })
     }
 }

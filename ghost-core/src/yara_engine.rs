@@ -185,7 +185,7 @@ impl DynamicYaraEngine {
             .map_err(|e| GhostError::Configuration {
                 message: format!("Rule compilation failed: {}", e),
             })?;
-        
+
         self.compiled_rules = Some(compiled_rules);
 
         log::info!("Successfully compiled {} YARA rules", rule_count);
@@ -241,7 +241,7 @@ impl DynamicYaraEngine {
         let mut bytes_scanned = 0u64;
 
         // Scan each executable memory region
-        for region in memory_regions.iter() {
+        for region in memory_regions {
             // Only scan executable regions with reasonable size
             if !region.protection.is_executable() {
                 continue;
@@ -341,7 +341,7 @@ impl DynamicYaraEngine {
                         offset: (base_address + m.offset) as u64,
                         length: m.length as u32,
                         metadata: metadata.clone(),
-                        matched_strings: vec![identifier.clone()],
+                        matched_strings: vec![identifier],
                     });
                 }
             }
