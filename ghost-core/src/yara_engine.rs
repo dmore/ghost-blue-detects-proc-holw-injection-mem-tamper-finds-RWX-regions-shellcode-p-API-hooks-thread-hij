@@ -60,7 +60,7 @@ struct CachedScanResult {
 }
 
 impl DynamicYaraEngine {
-    pub fn new(config_path: Option<&str>) -> Result<Self, GhostError> {
+    pub fn new(_config_path: Option<&str>) -> Result<Self, GhostError> {
         let sources = vec![
             YaraRuleSource {
                 name: "Malware Bazaar".to_string(),
@@ -113,7 +113,7 @@ impl DynamicYaraEngine {
 
     pub async fn scan_process(
         &self,
-        process: &ProcessInfo,
+        _process: &ProcessInfo,
         memory_regions: &[MemoryRegion],
     ) -> Result<YaraScanResult, GhostError> {
         let start_time = SystemTime::now();
@@ -121,7 +121,7 @@ impl DynamicYaraEngine {
         let mut bytes_scanned = 0;
 
         // Simulate YARA scanning
-        for (i, region) in memory_regions.iter().enumerate() {
+        for region in memory_regions.iter() {
             bytes_scanned += region.size;
 
             // Simulate finding suspicious patterns

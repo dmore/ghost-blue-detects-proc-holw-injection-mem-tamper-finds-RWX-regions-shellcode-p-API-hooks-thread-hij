@@ -626,15 +626,19 @@ mod platform {
 #[cfg(target_os = "macos")]
 mod platform {
     use super::{MemoryProtection, MemoryRegion};
-    use anyhow::{Context, Result};
-    use libc::{c_int, pid_t, size_t};
-    use std::ptr;
+    use anyhow::Result;
+    use libc::{c_int, pid_t};
 
     // Mach types and constants
+    #[allow(non_camel_case_types)]
     type mach_port_t = u32;
+    #[allow(non_camel_case_types)]
     type vm_address_t = usize;
+    #[allow(non_camel_case_types)]
     type vm_size_t = usize;
+    #[allow(non_camel_case_types)]
     type vm_prot_t = c_int;
+    #[allow(non_camel_case_types)]
     type kern_return_t = c_int;
 
     const KERN_SUCCESS: kern_return_t = 0;

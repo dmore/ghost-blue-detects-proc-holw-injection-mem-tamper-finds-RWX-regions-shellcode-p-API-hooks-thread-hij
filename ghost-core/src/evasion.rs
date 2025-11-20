@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{MemoryProtection, MemoryRegion, ProcessInfo, ThreadInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -785,7 +787,7 @@ impl TimingAnalyzer {
         }
     }
 
-    fn detect_sleep_evasion(&self, process: &ProcessInfo) -> Option<EvasionTechnique> {
+    fn detect_sleep_evasion(&self, _process: &ProcessInfo) -> Option<EvasionTechnique> {
         // Detect various sleep-based evasion techniques
         // This would analyze actual sleep patterns in a real implementation
         Some(EvasionTechnique {
@@ -803,8 +805,8 @@ impl TimingAnalyzer {
 
     fn detect_timing_anomalies(
         &self,
-        process: &ProcessInfo,
-        threads: &[ThreadInfo],
+        _process: &ProcessInfo,
+        _threads: &[ThreadInfo],
     ) -> Option<EvasionTechnique> {
         // Detect timing-based anti-analysis techniques
         Some(EvasionTechnique {
@@ -822,7 +824,7 @@ impl TimingAnalyzer {
 }
 
 #[derive(Debug, Clone)]
-struct TimingEvasionResult {
+pub struct TimingEvasionResult {
     techniques: Vec<EvasionTechnique>,
     confidence: f32,
     sophistication: f32,
@@ -882,7 +884,7 @@ impl EnvironmentChecker {
         }
     }
 
-    fn detect_vm_evasion(&self, process: &ProcessInfo) -> Option<EvasionTechnique> {
+    fn detect_vm_evasion(&self, _process: &ProcessInfo) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Virtual Machine Detection".to_string(),
             mitre_id: "T1497.001".to_string(),
@@ -896,7 +898,7 @@ impl EnvironmentChecker {
         })
     }
 
-    fn detect_debugger_evasion(&self, process: &ProcessInfo) -> Option<EvasionTechnique> {
+    fn detect_debugger_evasion(&self, _process: &ProcessInfo) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Debugger Detection".to_string(),
             mitre_id: "T1497.001".to_string(),
@@ -911,7 +913,7 @@ impl EnvironmentChecker {
         })
     }
 
-    fn detect_sandbox_evasion(&self, process: &ProcessInfo) -> Option<EvasionTechnique> {
+    fn detect_sandbox_evasion(&self, _process: &ProcessInfo) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Sandbox Detection".to_string(),
             mitre_id: "T1497.001".to_string(),
@@ -928,7 +930,7 @@ impl EnvironmentChecker {
 }
 
 #[derive(Debug, Clone)]
-struct EnvironmentEvasionResult {
+pub struct EnvironmentEvasionResult {
     techniques: Vec<EvasionTechnique>,
     confidence: f32,
     sophistication: f32,
@@ -954,7 +956,7 @@ impl BehaviorAnalyzer {
         &mut self,
         process: &ProcessInfo,
         memory_regions: &[MemoryRegion],
-        threads: &[ThreadInfo],
+        _threads: &[ThreadInfo],
     ) -> BehaviorEvasionResult {
         let mut techniques = Vec::new();
         let mut confidence = 0.0f32;
@@ -990,7 +992,7 @@ impl BehaviorAnalyzer {
 }
 
 #[derive(Debug, Clone)]
-struct BehaviorEvasionResult {
+pub struct BehaviorEvasionResult {
     techniques: Vec<EvasionTechnique>,
     confidence: f32,
     sophistication: f32,
@@ -1012,7 +1014,7 @@ impl ApiHookingDetector {
         }
     }
 
-    pub fn detect_api_evasion(&self, process: &ProcessInfo) -> Option<EvasionTechnique> {
+    pub fn detect_api_evasion(&self, _process: &ProcessInfo) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "API Hooking Evasion".to_string(),
             mitre_id: "T1562.002".to_string(),
@@ -1057,8 +1059,8 @@ impl ExecutionFlowAnalyzer {
 
     pub fn analyze_execution_flow(
         &self,
-        process: &ProcessInfo,
-        memory_regions: &[MemoryRegion],
+        _process: &ProcessInfo,
+        _memory_regions: &[MemoryRegion],
     ) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Control Flow Hijacking".to_string(),
@@ -1165,8 +1167,8 @@ impl ObfuscationDetector {
 
     fn detect_packer_evasion(
         &self,
-        process: &ProcessInfo,
-        memory_regions: &[MemoryRegion],
+        _process: &ProcessInfo,
+        _memory_regions: &[MemoryRegion],
     ) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Runtime Packing".to_string(),
@@ -1184,8 +1186,8 @@ impl ObfuscationDetector {
 
     fn detect_code_obfuscation(
         &self,
-        process: &ProcessInfo,
-        memory_regions: &[MemoryRegion],
+        _process: &ProcessInfo,
+        _memory_regions: &[MemoryRegion],
     ) -> Option<EvasionTechnique> {
         Some(EvasionTechnique {
             technique_name: "Code Obfuscation".to_string(),
@@ -1203,7 +1205,7 @@ impl ObfuscationDetector {
 }
 
 #[derive(Debug, Clone)]
-struct ObfuscationEvasionResult {
+pub struct ObfuscationEvasionResult {
     techniques: Vec<EvasionTechnique>,
     confidence: f32,
     sophistication: f32,

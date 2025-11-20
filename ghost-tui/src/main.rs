@@ -4,24 +4,13 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ghost_core::{DetectionEngine, ThreatLevel};
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    symbols,
-    text::{Line, Span, Text},
-    widgets::{
-        Block, Borders, Cell, Clear, Gauge, List, ListItem, ListState, Paragraph, Row, Table,
-        TableState, Tabs, Wrap,
-    },
-    Frame, Terminal,
+    backend::{Backend, CrosstermBackend}, Terminal,
 };
 use std::{
-    collections::VecDeque,
     io,
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio::{sync::Mutex, time};
 
@@ -29,7 +18,7 @@ mod app;
 mod events;
 mod ui;
 
-use app::{App, TabIndex};
+use app::App;
 
 #[tokio::main]
 async fn main() -> Result<()> {

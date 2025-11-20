@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{GhostError, MemoryRegion, ProcessInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,7 +63,7 @@ pub struct TechniquePrediction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CachedPrediction {
+pub struct CachedPrediction {
     result: InferenceResult,
     timestamp: SystemTime,
     ttl: Duration,

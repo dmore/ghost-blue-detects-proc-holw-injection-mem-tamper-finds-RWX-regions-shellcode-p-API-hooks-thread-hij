@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{
     DetectionEngine, DetectionResult, MemoryProtection, MemoryRegion, ProcessInfo, ThreadInfo,
     ThreatLevel,

@@ -3,6 +3,8 @@
 //! This module manages the core application state, including process scanning,
 //! detection events, and user interaction state.
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ghost_core::{

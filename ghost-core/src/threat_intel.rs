@@ -1,4 +1,6 @@
-use crate::{DetectionResult, ProcessInfo, ThreatLevel};
+#![allow(dead_code)]
+
+use crate::{DetectionResult, ThreatLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -431,7 +433,7 @@ impl ThreatIntelligence {
 
     async fn fetch_json_feed(
         &self,
-        feed: &ThreatFeed,
+        _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
         // Placeholder implementation
         // In a real implementation, this would fetch from the feed URL
@@ -440,7 +442,7 @@ impl ThreatIntelligence {
 
     async fn fetch_stix_feed(
         &self,
-        feed: &ThreatFeed,
+        _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
         // Placeholder implementation
         // In a real implementation, this would parse STIX/TAXII data
@@ -449,7 +451,7 @@ impl ThreatIntelligence {
 
     async fn fetch_csv_feed(
         &self,
-        feed: &ThreatFeed,
+        _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
         // Placeholder implementation
         // In a real implementation, this would parse CSV threat data
@@ -680,7 +682,7 @@ impl AttributionEngine {
         &self,
         rule: &AttributionRule,
         iocs: &[IndicatorOfCompromise],
-        indicators: &[String],
+        _indicators: &[String],
     ) -> f32 {
         let mut total_confidence = 0.0f32;
         let mut condition_count = 0;

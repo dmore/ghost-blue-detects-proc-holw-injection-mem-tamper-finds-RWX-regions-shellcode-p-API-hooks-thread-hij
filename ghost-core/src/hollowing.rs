@@ -143,7 +143,7 @@ impl HollowingDetector {
 
     fn check_main_image_unmapping(
         &self,
-        process: &ProcessInfo,
+        _process: &ProcessInfo,
         regions: &[MemoryRegion],
     ) -> Option<HollowingIndicator> {
         // Look for the main executable image region

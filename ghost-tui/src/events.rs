@@ -1,6 +1,8 @@
 // Event handling module for future expansion
 // Currently events are handled in main.rs but this provides structure for complex event handling
 
+#![allow(dead_code)]
+
 use crossterm::event::{Event, KeyEvent, MouseEvent};
 
 #[derive(Debug, Clone)]

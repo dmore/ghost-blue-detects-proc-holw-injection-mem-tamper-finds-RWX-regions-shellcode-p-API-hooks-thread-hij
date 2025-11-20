@@ -3,6 +3,8 @@
 //! This module provides all the drawing functions for the TUI components,
 //! including the main dashboard, process list, detection history, and system logs.
 
+#![allow(dead_code, unused_imports)]
+
 use crate::app::{App, TabIndex};
 use ghost_core::ThreatLevel;
 use ratatui::{
