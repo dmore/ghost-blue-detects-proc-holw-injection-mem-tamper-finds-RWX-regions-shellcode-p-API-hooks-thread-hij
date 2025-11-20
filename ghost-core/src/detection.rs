@@ -4,18 +4,19 @@
 //! analysis techniques including memory scanning, shellcode detection,
 //! process hollowing detection, and behavioral anomaly analysis.
 
-use crate::{
-    detect_hook_injection, AnomalyDetector, DetectionConfig, EvasionDetector, EvasionResult,
-    GhostError, HollowingDetector, MemoryProtection, MemoryRegion, MitreAnalysisResult, MitreAttackEngine,
-    ProcessInfo, ShellcodeDetector, ThreadInfo, ThreatContext, ThreatIntelligence,
-};
 #[cfg(target_os = "linux")]
 use crate::EbpfDetector;
+use crate::{
+    detect_hook_injection, AnomalyDetector, DetectionConfig, EvasionDetector, EvasionResult,
+    GhostError, HollowingDetector, MemoryProtection, MemoryRegion, MitreAnalysisResult,
+    MitreAttackEngine, ProcessInfo, ShellcodeDetector, ThreadInfo, ThreatContext,
+    ThreatIntelligence,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Threat classification levels for detected processes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub enum ThreatLevel {
     /// Process appears normal with no suspicious indicators.
     Clean,
@@ -56,6 +57,7 @@ pub struct DetectionResult {
 }
 
 /// Main detection engine that orchestrates all analysis components.
+#[derive(Debug)]
 pub struct DetectionEngine {
     baseline: HashMap<u32, ProcessBaseline>,
     shellcode_detector: ShellcodeDetector,
@@ -180,22 +182,22 @@ impl DetectionEngine {
                 indicators.push(format!("{} new threads created", diff));
                 confidence += 0.2;
             }
-            
+
             // Detect significant RWX increase (possible injection)
             if rwx_count > baseline.rwx_regions + 1 {
                 indicators.push("Rapid RWX region allocation".to_string());
                 confidence += 0.5;
             }
         }
-        
+
         // Check for unusual memory patterns
         self.check_memory_patterns(memory_regions, &mut indicators, &mut confidence);
-        
+
         // Analyze threads if provided
         if let Some(thread_list) = threads {
             self.analyze_threads(thread_list, &mut indicators, &mut confidence);
         }
-        
+
         // Check for Windows hook injection
         if let Ok(hook_result) = detect_hook_injection(process.pid) {
             if hook_result.suspicious_count > 0 {
@@ -205,13 +207,13 @@ impl DetectionEngine {
                 ));
                 confidence += 0.6; // High confidence for hook-based injection
             }
-            
+
             if hook_result.global_hooks > 8 {
                 indicators.push("Excessive global hooks (possible system compromise)".to_string());
                 confidence += 0.3;
             }
         }
-        
+
         // Scan for shellcode patterns in executable memory regions
         let shellcode_detections = self.scan_for_shellcode(memory_regions);
         if !shellcode_detections.is_empty() {
@@ -224,34 +226,41 @@ impl DetectionEngine {
                 confidence += detection.confidence;
             }
         }
-        
+
         // Check for process hollowing
-        if let Ok(Some(hollowing_detection)) = self.hollowing_detector.analyze_process(process, memory_regions) {
+        if let Ok(Some(hollowing_detection)) = self
+            .hollowing_detector
+            .analyze_process(process, memory_regions)
+        {
             for indicator in &hollowing_detection.indicators {
                 indicators.push(format!("Process hollowing: {}", indicator));
             }
             confidence += hollowing_detection.confidence;
         }
-        
+
         // ML-based anomaly detection
-        let features = self.anomaly_detector.extract_features(process, memory_regions, threads);
+        let features = self
+            .anomaly_detector
+            .extract_features(process, memory_regions, threads);
         if let Ok(anomaly_score) = self.anomaly_detector.analyze_anomaly(process, &features) {
             if self.anomaly_detector.is_anomalous(&anomaly_score) {
                 indicators.push(format!(
                     "ML anomaly detected: {:.1}% confidence",
                     anomaly_score.overall_score * 100.0
                 ));
-                
+
                 for outlier in &anomaly_score.outlier_features {
                     indicators.push(format!("Outlier: {}", outlier));
                 }
-                
+
                 confidence += (anomaly_score.overall_score * anomaly_score.confidence) as f32;
             }
         }
 
         // Advanced evasion detection
-        let evasion_result = self.evasion_detector.analyze_evasion(process, memory_regions, threads.unwrap_or(&[]));
+        let evasion_result =
+            self.evasion_detector
+                .analyze_evasion(process, memory_regions, threads.unwrap_or(&[]));
         if evasion_result.confidence > 0.3 {
             for technique in &evasion_result.evasion_techniques {
                 indicators.push(format!(
@@ -260,14 +269,14 @@ impl DetectionEngine {
                     technique.confidence * 100.0
                 ));
             }
-            
+
             for indicator in &evasion_result.anti_analysis_indicators {
                 indicators.push(format!("Anti-analysis: {}", indicator));
             }
-            
+
             // Increase confidence based on evasion sophistication
             confidence += evasion_result.confidence * 0.4;
-            
+
             // Boost threat level for sophisticated evasion
             if evasion_result.sophistication_score > 0.7 {
                 confidence += 0.2; // Additional boost for advanced evasion
@@ -291,7 +300,10 @@ impl DetectionEngine {
         };
 
         // Create initial detection result
-        let mut detection_result = DetectionResult {
+
+        // Enrich with threat intelligence (async operation would be handled by caller)
+        // For now, we'll set a placeholder that can be enriched later
+        DetectionResult {
             process: process.clone(),
             threat_level,
             indicators,
@@ -299,17 +311,16 @@ impl DetectionEngine {
             threat_context: None,
             evasion_analysis: None,
             mitre_analysis: None,
-        };
-
-        // Enrich with threat intelligence (async operation would be handled by caller)
-        // For now, we'll set a placeholder that can be enriched later
-        detection_result
+        }
     }
 
     /// Enrich detection result with threat intelligence
-    pub async fn enrich_with_threat_intel(&self, mut detection: DetectionResult) -> DetectionResult {
+    pub async fn enrich_with_threat_intel(
+        &self,
+        mut detection: DetectionResult,
+    ) -> DetectionResult {
         let threat_context = self.threat_intelligence.enrich_detection(&detection).await;
-        
+
         // Update threat level based on threat intelligence findings
         if threat_context.risk_score > 0.8 {
             detection.threat_level = ThreatLevel::Malicious;
@@ -321,11 +332,15 @@ impl DetectionEngine {
 
         // Add threat intelligence indicators
         for ioc in &threat_context.matched_iocs {
-            detection.indicators.push(format!("IOC Match: {} ({})", ioc.value, ioc.source));
+            detection
+                .indicators
+                .push(format!("IOC Match: {} ({})", ioc.value, ioc.source));
         }
 
         if let Some(actor) = &threat_context.threat_actor {
-            detection.indicators.push(format!("Attributed to: {}", actor.name));
+            detection
+                .indicators
+                .push(format!("Attributed to: {}", actor.name));
         }
 
         detection.threat_context = Some(threat_context);
@@ -341,19 +356,23 @@ impl DetectionEngine {
     ) -> DetectionResult {
         // Perform standard detection
         let mut detection_result = self.analyze_process(process, memory_regions, Some(threads));
-        
+
         // Add evasion analysis
-        let evasion_result = self.evasion_detector.analyze_evasion(process, memory_regions, threads);
-        
+        let evasion_result =
+            self.evasion_detector
+                .analyze_evasion(process, memory_regions, threads);
+
         // Update threat level based on evasion analysis
         if evasion_result.confidence > 0.7 {
             detection_result.threat_level = ThreatLevel::Malicious;
-            detection_result.confidence = (detection_result.confidence + evasion_result.confidence) / 2.0;
+            detection_result.confidence =
+                (detection_result.confidence + evasion_result.confidence) / 2.0;
         } else if evasion_result.confidence > 0.4 {
             detection_result.threat_level = ThreatLevel::Suspicious;
-            detection_result.confidence = (detection_result.confidence + evasion_result.confidence * 0.7) / 2.0;
+            detection_result.confidence =
+                (detection_result.confidence + evasion_result.confidence * 0.7) / 2.0;
         }
-        
+
         detection_result.evasion_analysis = Some(evasion_result);
         detection_result
     }
@@ -365,7 +384,7 @@ impl DetectionEngine {
             match ebpf_detector.process_events() {
                 Ok(ebpf_events) => {
                     let mut detection_results = Vec::new();
-                    
+
                     for ebpf_event in ebpf_events {
                         // Convert eBPF detection event to standard DetectionResult
                         let detection_result = DetectionResult {
@@ -382,10 +401,10 @@ impl DetectionEngine {
                             threat_context: None,
                             evasion_analysis: None,
                         };
-                        
+
                         detection_results.push(detection_result);
                     }
-                    
+
                     Ok(detection_results)
                 }
                 Err(e) => {
@@ -401,7 +420,9 @@ impl DetectionEngine {
     /// Get eBPF detector statistics (Linux only)
     #[cfg(target_os = "linux")]
     pub fn get_ebpf_statistics(&self) -> Option<crate::ebpf::EbpfStatistics> {
-        self.ebpf_detector.as_ref().map(|detector| detector.get_statistics())
+        self.ebpf_detector
+            .as_ref()
+            .map(|detector| detector.get_statistics())
     }
 
     /// Check for suspicious memory patterns
@@ -429,7 +450,7 @@ impl DetectionEngine {
         // Check for memory gaps that might indicate hollowing
         let mut sorted_regions: Vec<_> = regions.iter().collect();
         sorted_regions.sort_by_key(|r| r.base_address);
-        
+
         for window in sorted_regions.windows(2) {
             let gap = window[1].base_address - (window[0].base_address + window[0].size);
             if gap > 0x100000 && gap < 0x1000000 {
@@ -466,10 +487,7 @@ impl DetectionEngine {
         }
 
         // Check for abnormal thread creation time patterns
-        let recent_threads = threads
-            .iter()
-            .filter(|t| t.creation_time > 0)
-            .count();
+        let recent_threads = threads.iter().filter(|t| t.creation_time > 0).count();
 
         if recent_threads as f32 / threads.len() as f32 > 0.5 {
             indicators.push("High ratio of recently created threads".to_string());
@@ -536,7 +554,9 @@ impl DetectionEngine {
         memory_regions: &[MemoryRegion],
         threads: &[ThreadInfo],
     ) -> Result<MitreAnalysisResult, GhostError> {
-        self.mitre_engine.analyze_attack_patterns(process, memory_regions, threads).await
+        self.mitre_engine
+            .analyze_attack_patterns(process, memory_regions, threads)
+            .await
     }
 
     /// Enrich detection result with MITRE ATT&CK analysis
@@ -546,14 +566,18 @@ impl DetectionEngine {
         memory_regions: &[MemoryRegion],
         threads: &[ThreadInfo],
     ) -> DetectionResult {
-        if let Ok(mitre_analysis) = self.mitre_engine.analyze_attack_patterns(&detection.process, memory_regions, threads).await {
+        if let Ok(mitre_analysis) = self
+            .mitre_engine
+            .analyze_attack_patterns(&detection.process, memory_regions, threads)
+            .await
+        {
             // Update threat level based on MITRE analysis
             if mitre_analysis.risk_assessment.overall_risk_score > 0.8 {
                 detection.threat_level = ThreatLevel::Malicious;
-            } else if mitre_analysis.risk_assessment.overall_risk_score > 0.5 {
-                if detection.threat_level == ThreatLevel::Clean {
-                    detection.threat_level = ThreatLevel::Suspicious;
-                }
+            } else if mitre_analysis.risk_assessment.overall_risk_score > 0.5
+                && detection.threat_level == ThreatLevel::Clean
+            {
+                detection.threat_level = ThreatLevel::Suspicious;
             }
 
             // Add MITRE technique indicators
@@ -576,7 +600,8 @@ impl DetectionEngine {
             }
 
             // Update confidence with MITRE insights
-            detection.confidence = (detection.confidence + mitre_analysis.risk_assessment.overall_risk_score) / 2.0;
+            detection.confidence =
+                (detection.confidence + mitre_analysis.risk_assessment.overall_risk_score) / 2.0;
             detection.mitre_analysis = Some(mitre_analysis);
         }
 

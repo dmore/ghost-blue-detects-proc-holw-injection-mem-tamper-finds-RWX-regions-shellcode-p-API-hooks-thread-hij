@@ -1,7 +1,14 @@
+// eBPF module - currently stub implementation for Linux
+// Most functionality not yet implemented
+
+#[cfg(target_os = "linux")]
+use crate::ProcessInfo;
+#[cfg(target_os = "linux")]
 use std::collections::HashMap;
+#[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, Duration};
-use crate::{ProcessInfo, MemoryRegion, DetectionResult, ThreatLevel};
+#[cfg(target_os = "linux")]
+use std::time::{Duration, SystemTime};
 
 /// Linux eBPF-based Process Injection Detection
 /// Provides kernel-level tracing and detection capabilities on Linux systems
@@ -444,7 +451,10 @@ pub enum FilterCondition {
     ProcessName(String),
     ProcessId(u32),
     UserId(u32),
-    EventFrequency { max_events: u32, time_window: Duration },
+    EventFrequency {
+        max_events: u32,
+        time_window: Duration,
+    },
     MemoryThreshold(u64),
     FilePattern(String),
     NetworkDestination(String),
@@ -504,7 +514,7 @@ impl EbpfDetector {
 
         // Set up event processing
         self.setup_event_handlers()?;
-        
+
         // Configure default filters
         self.setup_default_filters()?;
 
@@ -625,10 +635,8 @@ impl EbpfDetector {
             Box::new(ProcessCreateHandler::new()),
         );
 
-        self.event_processor.register_handler(
-            EventType::MemoryMap,
-            Box::new(MemoryMapHandler::new()),
-        );
+        self.event_processor
+            .register_handler(EventType::MemoryMap, Box::new(MemoryMapHandler::new()));
 
         self.event_processor.register_handler(
             EventType::MemoryProtect,
@@ -684,7 +692,7 @@ impl EbpfDetector {
     /// Process events from the ring buffer
     pub fn process_events(&mut self) -> Result<Vec<DetectionEvent>, EbpfError> {
         let mut detection_events = Vec::new();
-        
+
         let events = {
             let mut buffer = self.ring_buffer.lock().unwrap();
             buffer.drain_events()
@@ -746,8 +754,8 @@ impl EbpfDetector {
             loaded_programs: self.program_manager.loaded_programs.len(),
             total_events_processed: 0, // Would be tracked in real implementation
             detections_generated: 0,   // Would be tracked in real implementation
-            filter_efficiency: 0.0,   // Would be calculated in real implementation
-            performance_impact: 0.0,  // Would be measured in real implementation
+            filter_efficiency: 0.0,    // Would be calculated in real implementation
+            performance_impact: 0.0,   // Would be measured in real implementation
         }
     }
 }

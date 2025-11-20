@@ -1,10 +1,11 @@
-use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
+use crate::{MemoryProtection, MemoryRegion, ProcessInfo, ThreadInfo};
 use serde::{Deserialize, Serialize};
-use crate::{ProcessInfo, MemoryRegion, ThreadInfo, MemoryProtection};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
 /// Advanced Evasion Detection Module
 /// Detects sophisticated anti-analysis and evasion techniques
+#[derive(Debug)]
 pub struct EvasionDetector {
     timing_analyzer: TimingAnalyzer,
     environment_checker: EnvironmentChecker,
@@ -32,13 +33,14 @@ pub struct EvasionTechnique {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EvasionSeverity {
-    Low,       // Basic evasion attempts
-    Medium,    // Moderate sophistication
-    High,      // Advanced techniques
-    Critical,  // Nation-state level evasion
+    Low,      // Basic evasion attempts
+    Medium,   // Moderate sophistication
+    High,     // Advanced techniques
+    Critical, // Nation-state level evasion
 }
 
 /// Timing-based evasion detection
+#[derive(Debug)]
 pub struct TimingAnalyzer {
     execution_timings: HashMap<u32, Vec<ExecutionTiming>>,
     sleep_patterns: HashMap<u32, Vec<SleepPattern>>,
@@ -76,6 +78,7 @@ pub enum SleepContext {
 }
 
 /// Environment-based evasion detection
+#[derive(Debug)]
 pub struct EnvironmentChecker {
     vm_indicators: Vec<VmIndicator>,
     debugger_checks: Vec<DebuggerCheck>,
@@ -91,11 +94,11 @@ pub struct VmIndicator {
 
 #[derive(Debug, Clone)]
 pub enum VmIndicatorType {
-    ProcessName,     // VM-related processes
-    RegistryKey,     // VM registry artifacts
-    FilePath,        // VM file system artifacts
-    HardwareId,      // VM hardware identifiers
-    Timing,          // VM timing anomalies
+    ProcessName, // VM-related processes
+    RegistryKey, // VM registry artifacts
+    FilePath,    // VM file system artifacts
+    HardwareId,  // VM hardware identifiers
+    Timing,      // VM timing anomalies
 }
 
 #[derive(Debug, Clone)]
@@ -117,10 +120,10 @@ pub enum DebuggerCheckType {
 
 #[derive(Debug, Clone)]
 pub enum BypassDifficulty {
-    Trivial,    // Easy to bypass
-    Moderate,   // Requires knowledge
-    Difficult,  // Advanced techniques needed
-    Expert,     // Very sophisticated bypass required
+    Trivial,   // Easy to bypass
+    Moderate,  // Requires knowledge
+    Difficult, // Advanced techniques needed
+    Expert,    // Very sophisticated bypass required
 }
 
 #[derive(Debug, Clone)]
@@ -131,6 +134,7 @@ pub struct SandboxSignature {
 }
 
 /// Behavioral analysis for evasion detection
+#[derive(Debug)]
 pub struct BehaviorAnalyzer {
     api_hooking_detector: ApiHookingDetector,
     execution_flow_analyzer: ExecutionFlowAnalyzer,
@@ -572,6 +576,7 @@ pub enum CleanupMethod {
 }
 
 /// Code obfuscation and packing detection
+#[derive(Debug)]
 pub struct ObfuscationDetector {
     packer_signatures: Vec<PackerSignature>,
     obfuscation_patterns: Vec<ObfuscationPattern>,
@@ -647,6 +652,12 @@ pub enum KeyDerivation {
     UserInput,
 }
 
+impl Default for EvasionDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EvasionDetector {
     pub fn new() -> Self {
         Self {
@@ -670,7 +681,9 @@ impl EvasionDetector {
         let mut anti_analysis_indicators = Vec::new();
 
         // Timing-based evasion analysis
-        let timing_result = self.timing_analyzer.analyze_timing_evasion(process, threads);
+        let timing_result = self
+            .timing_analyzer
+            .analyze_timing_evasion(process, threads);
         if !timing_result.techniques.is_empty() {
             evasion_techniques.extend(timing_result.techniques);
             confidence += timing_result.confidence * 0.3;
@@ -686,9 +699,9 @@ impl EvasionDetector {
         }
 
         // Behavioral analysis
-        let behavior_result = self.behavior_analyzer.analyze_behavior_evasion(
-            process, memory_regions, threads
-        );
+        let behavior_result =
+            self.behavior_analyzer
+                .analyze_behavior_evasion(process, memory_regions, threads);
         if !behavior_result.techniques.is_empty() {
             evasion_techniques.extend(behavior_result.techniques);
             confidence += behavior_result.confidence * 0.25;
@@ -696,9 +709,9 @@ impl EvasionDetector {
         }
 
         // Obfuscation analysis
-        let obfuscation_result = self.obfuscation_detector.detect_obfuscation(
-            process, memory_regions
-        );
+        let obfuscation_result = self
+            .obfuscation_detector
+            .detect_obfuscation(process, memory_regions);
         if !obfuscation_result.techniques.is_empty() {
             evasion_techniques.extend(obfuscation_result.techniques);
             confidence += obfuscation_result.confidence * 0.15;
@@ -721,6 +734,12 @@ impl EvasionDetector {
             sophistication_score,
             anti_analysis_indicators,
         }
+    }
+}
+
+impl Default for TimingAnalyzer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -808,6 +827,12 @@ struct TimingEvasionResult {
     confidence: f32,
     sophistication: f32,
     indicators: Vec<String>,
+}
+
+impl Default for EnvironmentChecker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnvironmentChecker {
@@ -910,6 +935,12 @@ struct EnvironmentEvasionResult {
     indicators: Vec<String>,
 }
 
+impl Default for BehaviorAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BehaviorAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -939,9 +970,10 @@ impl BehaviorAnalyzer {
         }
 
         // Execution flow analysis
-        if let Some(flow_evasion) = self.execution_flow_analyzer.analyze_execution_flow(
-            process, memory_regions
-        ) {
+        if let Some(flow_evasion) = self
+            .execution_flow_analyzer
+            .analyze_execution_flow(process, memory_regions)
+        {
             techniques.push(flow_evasion);
             confidence += 0.5;
             sophistication += 0.8;
@@ -963,6 +995,12 @@ struct BehaviorEvasionResult {
     confidence: f32,
     sophistication: f32,
     indicators: Vec<String>,
+}
+
+impl Default for ApiHookingDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ApiHookingDetector {
@@ -987,6 +1025,12 @@ impl ApiHookingDetector {
             ],
             severity: EvasionSeverity::High,
         })
+    }
+}
+
+impl Default for ExecutionFlowAnalyzer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1031,6 +1075,12 @@ impl ExecutionFlowAnalyzer {
     }
 }
 
+impl Default for ResourceUsageMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResourceUsageMonitor {
     pub fn new() -> Self {
         Self {
@@ -1061,6 +1111,12 @@ impl ResourceUsageMonitor {
                 },
             },
         }
+    }
+}
+
+impl Default for ObfuscationDetector {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

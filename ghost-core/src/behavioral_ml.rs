@@ -1,7 +1,7 @@
-use crate::{ProcessInfo, MemoryRegion, ThreadInfo, GhostError};
+use crate::{GhostError, MemoryRegion, ProcessInfo, ThreadInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvancedBehavioralML {
@@ -169,16 +169,16 @@ impl AdvancedBehavioralML {
     ) -> Result<BehavioralAnalysisResult, GhostError> {
         // Extract behavioral features
         let features = self.extract_features(process, memory_regions, threads)?;
-        
+
         // Run ensemble prediction
         let threat_probability = self.predict_threat(&features).await?;
-        
+
         // Detect anomalies
         let anomalies = self.detect_anomalies(&features)?;
-        
+
         // Predict techniques
         let predicted_techniques = self.predict_techniques(&features)?;
-        
+
         Ok(BehavioralAnalysisResult {
             threat_probability,
             predicted_techniques,
@@ -204,21 +204,26 @@ impl AdvancedBehavioralML {
         _threads: &[ThreadInfo],
     ) -> Result<Vec<f32>, GhostError> {
         let mut features = Vec::new();
-        
+
         // Basic process features
         features.push(process.pid as f32);
         features.push(memory_regions.len() as f32);
-        
+
         // Memory protection features
-        let rwx_count = memory_regions.iter()
-            .filter(|r| r.protection.is_readable() && r.protection.is_writable() && r.protection.is_executable())
+        let rwx_count = memory_regions
+            .iter()
+            .filter(|r| {
+                r.protection.is_readable()
+                    && r.protection.is_writable()
+                    && r.protection.is_executable()
+            })
             .count() as f32;
         features.push(rwx_count);
-        
+
         // Size distribution
         let total_size: u64 = memory_regions.iter().map(|r| r.size as u64).sum();
         features.push(total_size as f32);
-        
+
         Ok(features)
     }
 

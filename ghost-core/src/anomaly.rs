@@ -1,4 +1,4 @@
-use crate::{GhostError, ProcessInfo, Result};
+use crate::{ProcessInfo, Result};
 use chrono::Timelike;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -41,6 +41,7 @@ pub struct ProcessProfile {
 }
 
 /// Advanced ML-based anomaly detection for process behavior
+#[derive(Debug)]
 pub struct AnomalyDetector {
     process_profiles: HashMap<String, ProcessProfile>,
     global_baseline: Option<ProcessProfile>,
@@ -69,10 +70,13 @@ impl AnomalyDetector {
     ) -> ProcessFeatures {
         let executable_regions = memory_regions
             .iter()
-            .filter(|r| matches!(
-                r.protection,
-                crate::MemoryProtection::ReadExecute | crate::MemoryProtection::ReadWriteExecute
-            ))
+            .filter(|r| {
+                matches!(
+                    r.protection,
+                    crate::MemoryProtection::ReadExecute
+                        | crate::MemoryProtection::ReadWriteExecute
+                )
+            })
             .count();
 
         let rwx_regions = memory_regions
@@ -91,11 +95,7 @@ impl AnomalyDetector {
             .count();
 
         let total_memory_size: usize = memory_regions.iter().map(|r| r.size).sum();
-        let largest_region_size = memory_regions
-            .iter()
-            .map(|r| r.size)
-            .max()
-            .unwrap_or(0);
+        let largest_region_size = memory_regions.iter().map(|r| r.size).max().unwrap_or(0);
 
         // Calculate memory fragmentation (std dev of region sizes)
         let mean_size = if memory_regions.is_empty() {
@@ -117,10 +117,7 @@ impl AnomalyDetector {
 
         // Thread-based features
         let thread_creation_rate = if let Some(thread_list) = threads {
-            let recent_threads = thread_list
-                .iter()
-                .filter(|t| t.creation_time > 0)
-                .count();
+            let recent_threads = thread_list.iter().filter(|t| t.creation_time > 0).count();
             recent_threads as f64 / thread_list.len().max(1) as f64
         } else {
             0.0
@@ -243,12 +240,12 @@ impl AnomalyDetector {
                 .iter()
                 .map(|(feature, score)| {
                     let weight = match feature.as_str() {
-                        "rwx_regions" => 0.3,        // High weight for RWX regions
+                        "rwx_regions" => 0.3,           // High weight for RWX regions
                         "thread_creation_rate" => 0.25, // High weight for thread anomalies
-                        "entropy_score" => 0.2,      // Medium weight for entropy
-                        "api_call_frequency" => 0.15, // Medium weight for API calls
-                        "memory_fragmentation" => 0.1, // Lower weight for fragmentation
-                        _ => 0.05,                    // Low weight for other features
+                        "entropy_score" => 0.2,         // Medium weight for entropy
+                        "api_call_frequency" => 0.15,   // Medium weight for API calls
+                        "memory_fragmentation" => 0.1,  // Lower weight for fragmentation
+                        _ => 0.05,                      // Low weight for other features
                     };
                     score * weight
                 })
@@ -259,8 +256,8 @@ impl AnomalyDetector {
 
         // Calculate confidence based on sample size and feature coverage
         let confidence = if let Some(profile) = baseline {
-            (profile.sample_count as f64 / 100.0).min(1.0) * 
-            (component_scores.len() as f64 / 6.0).min(1.0)
+            (profile.sample_count as f64 / 100.0).min(1.0)
+                * (component_scores.len() as f64 / 6.0).min(1.0)
         } else {
             0.0
         };
@@ -288,12 +285,12 @@ impl AnomalyDetector {
             if std > 0.0 {
                 // Calculate z-score
                 let z_score = (value - mean).abs() / std;
-                
+
                 // Convert z-score to anomaly score (0-1)
                 let anomaly_score = (z_score / 4.0).min(1.0); // Cap at 4 standard deviations
-                
+
                 component_scores.insert(feature_name.to_string(), anomaly_score);
-                
+
                 // Mark as outlier if beyond threshold
                 if z_score > self.outlier_threshold {
                     outlier_features.push(format!(
@@ -334,31 +331,52 @@ impl AnomalyDetector {
 
         for (feature_name, value) in feature_values {
             // Update mean
-            let old_mean = profile.feature_means.get(feature_name).copied().unwrap_or(0.0);
+            let old_mean = profile
+                .feature_means
+                .get(feature_name)
+                .copied()
+                .unwrap_or(0.0);
             let new_mean = old_mean + (value - old_mean) / n;
-            profile.feature_means.insert(feature_name.to_string(), new_mean);
+            profile
+                .feature_means
+                .insert(feature_name.to_string(), new_mean);
 
             // Update standard deviation (using variance)
             if n > 1.0 {
-                let old_std = profile.feature_stds.get(feature_name).copied().unwrap_or(0.0);
+                let old_std = profile
+                    .feature_stds
+                    .get(feature_name)
+                    .copied()
+                    .unwrap_or(0.0);
                 let old_variance = old_std * old_std;
-                let new_variance = ((n - 2.0) * old_variance + (value - old_mean) * (value - new_mean)) / (n - 1.0);
+                let new_variance = ((n - 2.0) * old_variance
+                    + (value - old_mean) * (value - new_mean))
+                    / (n - 1.0);
                 let new_std = new_variance.max(0.0).sqrt();
-                profile.feature_stds.insert(feature_name.to_string(), new_std);
+                profile
+                    .feature_stds
+                    .insert(feature_name.to_string(), new_std);
             }
         }
 
         profile.last_updated = chrono::Utc::now();
     }
 
-    fn estimate_api_call_frequency(&self, _process: &ProcessInfo, memory_regions: &[crate::MemoryRegion]) -> f64 {
+    fn estimate_api_call_frequency(
+        &self,
+        _process: &ProcessInfo,
+        memory_regions: &[crate::MemoryRegion],
+    ) -> f64 {
         // Heuristic: More executable regions might indicate more API calls
         let executable_count = memory_regions
             .iter()
-            .filter(|r| matches!(
-                r.protection,
-                crate::MemoryProtection::ReadExecute | crate::MemoryProtection::ReadWriteExecute
-            ))
+            .filter(|r| {
+                matches!(
+                    r.protection,
+                    crate::MemoryProtection::ReadExecute
+                        | crate::MemoryProtection::ReadWriteExecute
+                )
+            })
             .count();
 
         (executable_count as f64 / memory_regions.len().max(1) as f64) * 100.0
