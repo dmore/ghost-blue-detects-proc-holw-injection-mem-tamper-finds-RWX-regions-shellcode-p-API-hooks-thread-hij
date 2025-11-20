@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use yara::{Compiler, Rules, Scanner};
+use yara::{Compiler, Rules};
 
 #[derive(Serialize, Deserialize)]
 pub struct DynamicYaraEngine {
@@ -127,10 +127,7 @@ impl DynamicYaraEngine {
 
         if !rules_dir.exists() {
             return Err(GhostError::Configuration {
-                message: format!(
-                    "Rules directory does not exist: {}",
-                    rules_dir.display()
-                ),
+                message: format!("Rules directory does not exist: {}", rules_dir.display()),
             });
         }
 
@@ -300,9 +297,11 @@ impl DynamicYaraEngine {
         data: &[u8],
         base_address: usize,
     ) -> Result<Vec<RuleMatch>, GhostError> {
-        let scan_results = rules.scan_mem(data, 300).map_err(|e| GhostError::Detection {
-            message: format!("Scan failed: {}", e),
-        })?;
+        let scan_results = rules
+            .scan_mem(data, 300)
+            .map_err(|e| GhostError::Detection {
+                message: format!("Scan failed: {}", e),
+            })?;
 
         let mut matches = Vec::new();
 
