@@ -402,6 +402,13 @@ impl App {
     }
 
     pub fn get_tab_titles(&self) -> Vec<&str> {
-        vec!["Overview", "Processes", "Detections", "Threat Intel", "Memory", "Logs"]
+        vec![
+            "Overview",
+            "Processes",
+            "Detections",
+            "Threat Intel",
+            "Memory",
+            "Logs",
+        ]
     }
 }

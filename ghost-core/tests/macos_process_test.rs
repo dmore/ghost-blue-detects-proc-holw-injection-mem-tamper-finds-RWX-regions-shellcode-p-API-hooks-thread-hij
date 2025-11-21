@@ -47,7 +47,6 @@ fn test_process_info_structure() {
     let processes = process::enumerate_processes().expect("Failed to enumerate processes");
 
     for proc in processes.iter().take(10) {
-        assert!(proc.pid > 0 || proc.pid == 0);
         assert!(proc.thread_count >= 1);
 
         if proc.pid > 0 {

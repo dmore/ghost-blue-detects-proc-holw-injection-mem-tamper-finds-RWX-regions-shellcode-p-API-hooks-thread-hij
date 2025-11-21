@@ -436,6 +436,7 @@ impl DynamicYaraEngine {
 
     /// Read memory from a specific process and region (Linux implementation)
     #[cfg(target_os = "linux")]
+    #[allow(dead_code)]
     fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
