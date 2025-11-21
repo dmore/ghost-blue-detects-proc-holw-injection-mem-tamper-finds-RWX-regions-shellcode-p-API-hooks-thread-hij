@@ -322,11 +322,11 @@ mod platform {
                     #[cfg(target_arch = "x86_64")]
                     {
                         use windows::Win32::System::Diagnostics::Debug::{
-                            CONTEXT, CONTEXT_CONTROL,
+                            CONTEXT, CONTEXT_CONTROL_AMD64,
                         };
 
                         let mut context = CONTEXT {
-                            ContextFlags: CONTEXT_CONTROL,
+                            ContextFlags: CONTEXT_CONTROL_AMD64,
                             ..Default::default()
                         };
 
@@ -613,7 +613,7 @@ mod platform {
     /// Detect hardware breakpoints by examining debug registers (DR0-DR7)
     pub fn detect_hardware_breakpoints(pid: u32) -> Result<super::HardwareBreakpointResult> {
         use windows::Win32::System::Diagnostics::Debug::{
-            GetThreadContext, CONTEXT, CONTEXT_DEBUG_REGISTERS,
+            GetThreadContext, CONTEXT, CONTEXT_DEBUG_REGISTERS_AMD64,
         };
         use windows::Win32::System::Threading::{
             ResumeThread, SuspendThread, THREAD_GET_CONTEXT, THREAD_SUSPEND_RESUME,
@@ -641,7 +641,7 @@ mod platform {
                 if suspend_count != u32::MAX {
                     // Get thread context with debug registers
                     let mut context = CONTEXT {
-                        ContextFlags: CONTEXT_DEBUG_REGISTERS,
+                        ContextFlags: CONTEXT_DEBUG_REGISTERS_AMD64,
                         ..Default::default()
                     };
 
