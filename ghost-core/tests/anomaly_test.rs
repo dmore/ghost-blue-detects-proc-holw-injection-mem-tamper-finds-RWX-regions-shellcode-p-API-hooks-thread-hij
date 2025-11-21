@@ -1,5 +1,4 @@
 use ghost_core::{AnomalyDetector, MemoryProtection, MemoryRegion, ProcessInfo};
-use std::path::PathBuf;
 
 #[test]
 fn test_anomaly_detector_creation() {
@@ -94,7 +93,7 @@ fn test_profile_persistence() {
         let _ = detector.analyze_anomaly(&process, &features);
     }
 
-    let temp_path = PathBuf::from("/tmp/ghost_test_profiles.json");
+    let temp_path = std::env::temp_dir().join("ghost_test_profiles.json");
 
     let save_result = detector.save_profiles(&temp_path);
     assert!(
