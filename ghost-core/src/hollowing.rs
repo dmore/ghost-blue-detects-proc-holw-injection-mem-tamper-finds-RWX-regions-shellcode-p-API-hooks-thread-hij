@@ -573,6 +573,7 @@ impl HollowingDetector {
 
 /// PE section information for comparison
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PESection {
     name: String,
     virtual_address: usize,
@@ -582,6 +583,7 @@ struct PESection {
 }
 
 /// Parse PE sections from a buffer
+#[allow(dead_code)]
 fn parse_pe_sections(data: &[u8]) -> Result<Vec<PESection>> {
     use crate::GhostError;
 

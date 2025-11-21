@@ -265,24 +265,23 @@ impl DetectionEngine {
             let yara_result = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle
                     .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
-                Err(_) => {
-                    match tokio::runtime::Runtime::new() {
-                        Ok(runtime) => runtime
-                            .block_on(async { yara_engine.scan_process(process, memory_regions).await }),
-                        Err(e) => {
-                            log::error!("Failed to create async runtime: {}", e);
-                            return DetectionResult {
-                                process: process.clone(),
-                                threat_level: ThreatLevel::Clean,
-                                indicators: vec!["YARA scan failed due to runtime error".to_string()],
-                                confidence: 0.0,
-                                threat_context: None,
-                                evasion_analysis: None,
-                                mitre_analysis: None,
-                            };
-                        }
+                Err(_) => match tokio::runtime::Runtime::new() {
+                    Ok(runtime) => runtime.block_on(async {
+                        yara_engine.scan_process(process, memory_regions).await
+                    }),
+                    Err(e) => {
+                        log::error!("Failed to create async runtime: {}", e);
+                        return DetectionResult {
+                            process: process.clone(),
+                            threat_level: ThreatLevel::Clean,
+                            indicators: vec!["YARA scan failed due to runtime error".to_string()],
+                            confidence: 0.0,
+                            threat_context: None,
+                            evasion_analysis: None,
+                            mitre_analysis: None,
+                        };
                     }
-                }
+                },
             };
 
             if let Ok(yara_result) = yara_result {

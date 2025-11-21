@@ -23,7 +23,7 @@ pub struct ProcessFeatures {
     pub parent_child_ratio: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnomalyScore {
     pub overall_score: f64,
     pub component_scores: HashMap<String, f64>,
@@ -31,7 +31,7 @@ pub struct AnomalyScore {
     pub confidence: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessProfile {
     pub name: String,
     pub feature_means: HashMap<String, f64>,
@@ -278,20 +278,28 @@ impl AnomalyDetector {
         component_scores: &mut HashMap<String, f64>,
         outlier_features: &mut Vec<String>,
     ) {
+        if !value.is_finite() {
+            return;
+        }
+
         if let (Some(&mean), Some(&std)) = (
             profile.feature_means.get(feature_name),
             profile.feature_stds.get(feature_name),
         ) {
+            if !mean.is_finite() || !std.is_finite() {
+                return;
+            }
+
             if std > 0.0 {
-                // Calculate z-score
                 let z_score = (value - mean).abs() / std;
 
-                // Convert z-score to anomaly score (0-1)
-                let anomaly_score = (z_score / 4.0).min(1.0); // Cap at 4 standard deviations
+                if !z_score.is_finite() {
+                    return;
+                }
 
+                let anomaly_score = (z_score / 4.0).min(1.0);
                 component_scores.insert(feature_name.to_string(), anomaly_score);
 
-                // Mark as outlier if beyond threshold
                 if z_score > self.outlier_threshold {
                     outlier_features.push(format!(
                         "{}: {:.2} (μ={:.2}, σ={:.2}, z={:.2})",
@@ -341,17 +349,15 @@ impl AnomalyDetector {
                 .feature_means
                 .insert(feature_name.to_string(), new_mean);
 
-            // Update standard deviation (using variance)
+            // Update standard deviation using Welford's online algorithm
             if n > 1.0 {
-                let old_std = profile
+                let old_m2 = profile
                     .feature_stds
                     .get(feature_name)
-                    .copied()
+                    .map(|s| s * s * (n - 1.0))
                     .unwrap_or(0.0);
-                let old_variance = old_std * old_std;
-                let new_variance = ((n - 2.0) * old_variance
-                    + (value - old_mean) * (value - new_mean))
-                    / (n - 1.0);
+                let new_m2 = old_m2 + (value - old_mean) * (value - new_mean);
+                let new_variance = new_m2 / (n - 1.0);
                 let new_std = new_variance.max(0.0).sqrt();
                 profile
                     .feature_stds
@@ -418,6 +424,94 @@ impl AnomalyDetector {
 
     pub fn set_detection_threshold(&mut self, threshold: f64) {
         self.detection_threshold = threshold.clamp(0.0, 1.0);
+    }
+
+    pub fn save_profiles(&self, path: &std::path::Path) -> Result<()> {
+        use std::fs::File;
+        use std::io::Write;
+
+        let json = serde_json::to_string_pretty(&self.process_profiles)?;
+        let mut file = File::create(path)?;
+        file.write_all(json.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn load_profiles(&mut self, path: &std::path::Path) -> Result<()> {
+        use std::fs;
+
+        let json = fs::read_to_string(path)?;
+        self.process_profiles = serde_json::from_str(&json)?;
+        Ok(())
+    }
+
+    pub fn compute_global_baseline(&mut self) {
+        if self.process_profiles.is_empty() {
+            return;
+        }
+
+        let mut global_means: HashMap<String, Vec<f64>> = HashMap::new();
+        let mut total_samples = 0;
+
+        for profile in self.process_profiles.values() {
+            if profile.sample_count < self.min_samples_for_profile {
+                continue;
+            }
+
+            total_samples += profile.sample_count;
+
+            for (feature_name, &mean) in &profile.feature_means {
+                global_means
+                    .entry(feature_name.to_string())
+                    .or_default()
+                    .push(mean);
+            }
+        }
+
+        if total_samples == 0 {
+            return;
+        }
+
+        let mut feature_means = HashMap::new();
+        let mut feature_stds = HashMap::new();
+
+        for (feature_name, values) in global_means {
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            let variance = values
+                .iter()
+                .map(|v| {
+                    let diff = v - mean;
+                    diff * diff
+                })
+                .sum::<f64>()
+                / values.len().max(1) as f64;
+            let std = variance.sqrt();
+
+            feature_means.insert(feature_name.clone(), mean);
+            feature_stds.insert(feature_name, std);
+        }
+
+        self.global_baseline = Some(ProcessProfile {
+            name: "global_baseline".to_string(),
+            feature_means,
+            feature_stds,
+            sample_count: total_samples,
+            last_updated: chrono::Utc::now(),
+        });
+    }
+
+    pub fn cleanup_old_profiles(&mut self, max_age_hours: i64) {
+        let cutoff_time = chrono::Utc::now() - chrono::Duration::hours(max_age_hours);
+
+        self.process_profiles
+            .retain(|_, profile| profile.last_updated > cutoff_time);
+    }
+
+    pub fn get_all_profiles(&self) -> &HashMap<String, ProcessProfile> {
+        &self.process_profiles
+    }
+
+    pub fn clear_profile(&mut self, process_name: &str) -> bool {
+        self.process_profiles.remove(process_name).is_some()
     }
 }
 

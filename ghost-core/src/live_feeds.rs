@@ -294,8 +294,7 @@ impl LiveThreatFeeds {
                         ) {
                             // Map OTX threat level to our scale
                             let threat_level = indicator
-                                .get("expiration")
-                                .and_then(|_| Some(4))
+                                .get("expiration").map(|_| 4)
                                 .unwrap_or(3);
 
                             iocs.push(CachedIOC {

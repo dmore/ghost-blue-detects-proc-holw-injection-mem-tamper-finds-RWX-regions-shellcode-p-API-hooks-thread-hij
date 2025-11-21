@@ -1,10 +1,10 @@
-///! PE (Portable Executable) file parsing utilities for hook detection.
-///!
-///! This module provides comprehensive PE parsing capabilities including:
-///! - Import Address Table (IAT) extraction
-///! - Export Address Table (EAT) extraction
-///! - Data directory parsing
-///! - Function address resolution
+//! PE (Portable Executable) file parsing utilities for hook detection.
+//!
+//! This module provides comprehensive PE parsing capabilities including:
+//! - Import Address Table (IAT) extraction
+//! - Export Address Table (EAT) extraction
+//! - Data directory parsing
+//! - Function address resolution
 use crate::{GhostError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -314,6 +314,7 @@ fn parse_iat_from_buffer(buffer: &[u8]) -> Result<Vec<ImportEntry>> {
 }
 
 /// Helper to check if two addresses match considering ASLR
+#[allow(dead_code)]
 fn addresses_match_with_aslr(addr1: usize, addr2: usize) -> bool {
     // Simple heuristic: if addresses are in completely different ranges (different modules)
     // they don't match. This is a simplified check.

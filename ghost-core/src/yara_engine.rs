@@ -1,16 +1,24 @@
 use crate::{GhostError, MemoryRegion, ProcessInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::SystemTime;
+
+#[cfg(feature = "yara-scanning")]
+use std::fs;
+#[cfg(feature = "yara-scanning")]
+use std::path::Path;
+#[cfg(feature = "yara-scanning")]
 use yara::{Compiler, Rules};
 
 #[derive(Serialize, Deserialize)]
 pub struct DynamicYaraEngine {
     rules_path: Option<PathBuf>,
     #[serde(skip)]
+    #[cfg(feature = "yara-scanning")]
     compiled_rules: Option<Rules>,
+    #[cfg(not(feature = "yara-scanning"))]
+    compiled_rules: Option<()>,
     rule_metadata: Vec<YaraRuleMetadata>,
     scan_cache: HashMap<String, CachedScanResult>,
 }
@@ -99,24 +107,38 @@ impl DynamicYaraEngine {
     pub fn new(rules_path: Option<&str>) -> Result<Self, GhostError> {
         let rules_path = rules_path.map(PathBuf::from);
 
-        let mut engine = DynamicYaraEngine {
-            rules_path,
-            compiled_rules: None,
-            rule_metadata: Vec::new(),
-            scan_cache: HashMap::new(),
-        };
+        #[cfg(feature = "yara-scanning")]
+        {
+            let mut engine = DynamicYaraEngine {
+                rules_path,
+                compiled_rules: None,
+                rule_metadata: Vec::new(),
+                scan_cache: HashMap::new(),
+            };
 
-        // Attempt to load rules if path is provided
-        if engine.rules_path.is_some() {
-            if let Err(e) = engine.compile_rules() {
-                log::warn!("Failed to compile YARA rules: {:?}", e);
+            // Attempt to load rules if path is provided
+            if engine.rules_path.is_some() {
+                if let Err(e) = engine.compile_rules() {
+                    log::warn!("Failed to compile YARA rules: {:?}", e);
+                }
             }
+
+            Ok(engine)
         }
 
-        Ok(engine)
+        #[cfg(not(feature = "yara-scanning"))]
+        {
+            Ok(DynamicYaraEngine {
+                rules_path,
+                compiled_rules: None,
+                rule_metadata: Vec::new(),
+                scan_cache: HashMap::new(),
+            })
+        }
     }
 
     /// Compile all YARA rules from the rules directory
+    #[cfg(feature = "yara-scanning")]
     pub fn compile_rules(&mut self) -> Result<usize, GhostError> {
         let rules_dir = self
             .rules_path
@@ -153,7 +175,7 @@ impl DynamicYaraEngine {
                         log::error!("Failed to compile {}: {}", rule_file.display(), e);
                         continue;
                     }
-                    
+
                     log::info!("Compiled YARA rule: {}", rule_file.display());
 
                     self.rule_metadata.push(YaraRuleMetadata {
@@ -186,13 +208,21 @@ impl DynamicYaraEngine {
 
         self.compiled_rules = Some(compiled_rules);
 
-        self.compiled_rules = Some(compiled_rules);
-
         log::info!("Successfully compiled {} YARA rules", rule_count);
         Ok(rule_count)
     }
 
+    /// Compile all YARA rules from the rules directory (stub for disabled feature)
+    #[cfg(not(feature = "yara-scanning"))]
+    pub fn compile_rules(&mut self) -> Result<usize, GhostError> {
+        Err(GhostError::Configuration {
+            message: "YARA scanning is not enabled. Build with --features yara-scanning to enable.".to_string(),
+        })
+    }
+
     /// Find all YARA rule files in the given directory
+    #[cfg(feature = "yara-scanning")]
+    #[allow(dead_code)]
     fn find_rule_files(dir: &Path) -> Result<Vec<PathBuf>, GhostError> {
         let mut rule_files = Vec::new();
 
@@ -223,6 +253,7 @@ impl DynamicYaraEngine {
     }
 
     /// Scan process memory regions with compiled YARA rules
+    #[cfg(feature = "yara-scanning")]
     pub async fn scan_process(
         &self,
         process: &ProcessInfo,
@@ -291,7 +322,20 @@ impl DynamicYaraEngine {
         })
     }
 
+    /// Scan process memory regions with compiled YARA rules (stub for disabled feature)
+    #[cfg(not(feature = "yara-scanning"))]
+    pub async fn scan_process(
+        &self,
+        _process: &ProcessInfo,
+        _memory_regions: &[MemoryRegion],
+    ) -> Result<YaraScanResult, GhostError> {
+        Err(GhostError::Configuration {
+            message: "YARA scanning is not enabled. Build with --features yara-scanning to enable.".to_string(),
+        })
+    }
+
     /// Scan a memory buffer with YARA rules
+    #[cfg(feature = "yara-scanning")]
     fn scan_memory_with_yara(
         rules: &Rules,
         data: &[u8],
@@ -381,9 +425,9 @@ impl DynamicYaraEngine {
                 buffer.truncate(bytes_read);
                 Ok(buffer)
             } else {
-                Err(GhostError::MemoryReadError(
-                    "ReadProcessMemory failed".to_string(),
-                ))
+                Err(GhostError::MemoryEnumeration {
+                    reason: "ReadProcessMemory failed".to_string(),
+                })
             }
         }
     }
@@ -415,10 +459,11 @@ impl DynamicYaraEngine {
 
     /// Read memory from a specific process and region (macOS implementation)
     #[cfg(target_os = "macos")]
+    #[allow(dead_code)]
     fn read_process_memory(_pid: u32, _region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
-        Err(GhostError::NotImplemented(
-            "Memory reading not implemented for macOS".to_string(),
-        ))
+        Err(GhostError::PlatformNotSupported {
+            feature: "Memory reading not implemented for macOS".to_string(),
+        })
     }
 
     pub fn get_rule_count(&self) -> usize {

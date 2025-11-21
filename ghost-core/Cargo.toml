@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+yara-scanning = ["yara"]
+
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
@@ -14,8 +18,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
 toml = "0.8"
-chrono = "0.4"
-yara = "0.28"
+chrono = { version = "0.4", features = ["serde"] }
+yara = { version = "0.28", optional = true }
 sha2 = "0.10"
 reqwest = { version = "0.11", features = ["json"] }
 
