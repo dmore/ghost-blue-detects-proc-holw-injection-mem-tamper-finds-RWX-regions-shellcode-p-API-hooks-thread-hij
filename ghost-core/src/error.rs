@@ -16,6 +16,9 @@ pub enum GhostError {
     #[error("Memory enumeration failed: {reason}")]
     MemoryEnumeration { reason: String },
 
+    #[error("Memory read error: {message}")]
+    MemoryRead { message: String },
+
     #[error("Thread enumeration failed: {reason}")]
     ThreadEnumeration { reason: String },
 

@@ -410,7 +410,7 @@ impl DynamicYaraEngine {
     /// Read memory from a specific process and region
     #[cfg(target_os = "windows")]
     fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
-        use windows::Win32::Foundation::{CloseHandle, HANDLE};
+        use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
         use windows::Win32::System::Threading::{OpenProcess, PROCESS_VM_READ};
 

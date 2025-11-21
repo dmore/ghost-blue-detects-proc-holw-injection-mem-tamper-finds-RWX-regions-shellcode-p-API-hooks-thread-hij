@@ -289,11 +289,11 @@ fn parse_iat_from_disk(file_path: &str) -> Result<Vec<ImportEntry>> {
     use std::io::Read;
 
     let mut file = File::open(file_path)
-        .map_err(|e| GhostError::ConfigurationError(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| GhostError::Configuration { message: format!("Failed to open file: {}", e) })?;
 
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)
-        .map_err(|e| GhostError::ConfigurationError(format!("Failed to read file: {}", e)))?;
+        .map_err(|e| GhostError::Configuration { message: format!("Failed to read file: {}", e) })?;
 
     parse_iat_from_buffer(&buffer)
 }
@@ -301,11 +301,10 @@ fn parse_iat_from_disk(file_path: &str) -> Result<Vec<ImportEntry>> {
 /// Parse IAT from memory buffer
 #[cfg(windows)]
 fn parse_iat_from_buffer(buffer: &[u8]) -> Result<Vec<ImportEntry>> {
-    use std::mem;
 
     let reader = |_pid: u32, offset: usize, size: usize| -> Result<Vec<u8>> {
         if offset + size > buffer.len() {
-            return Err(GhostError::MemoryReadError("Buffer overflow".to_string()));
+            return Err(GhostError::MemoryRead { message: "Buffer overflow".to_string() });
         }
         Ok(buffer[offset..offset + size].to_vec())
     };
@@ -424,7 +423,7 @@ fn read_cstring(
         offset += 16;
 
         if offset > 512 {
-            return Err(GhostError::MemoryReadError("String too long".to_string()));
+            return Err(GhostError::MemoryRead { message: "String too long".to_string() });
         }
     }
 }

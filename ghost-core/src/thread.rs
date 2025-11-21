@@ -284,7 +284,6 @@ mod platform {
         pid: u32,
         memory_regions: &[crate::MemoryRegion],
     ) -> Result<super::ThreadHijackingResult> {
-        use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
         use windows::Win32::System::Threading::{
             GetThreadContext, OpenProcess, ResumeThread, SuspendThread, PROCESS_QUERY_INFORMATION,
             PROCESS_VM_READ, THREAD_GET_CONTEXT, THREAD_SUSPEND_RESUME,
