@@ -189,7 +189,11 @@ impl DynamicYaraEngine {
                             log::error!("Failed to compile {}: {}", rule_file.display(), e);
                             // Don't continue - compiler was consumed, return with error
                             return Err(GhostError::Configuration {
-                                message: format!("Failed to compile {}: {}", rule_file.display(), e),
+                                message: format!(
+                                    "Failed to compile {}: {}",
+                                    rule_file.display(),
+                                    e
+                                ),
                             });
                         }
                     }
