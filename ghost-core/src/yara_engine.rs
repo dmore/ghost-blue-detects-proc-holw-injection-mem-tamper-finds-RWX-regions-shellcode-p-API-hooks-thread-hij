@@ -408,7 +408,7 @@ impl DynamicYaraEngine {
     }
 
     /// Read memory from a specific process and region
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", feature = "yara-scanning"))]
     fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
@@ -446,8 +446,7 @@ impl DynamicYaraEngine {
     }
 
     /// Read memory from a specific process and region (Linux implementation)
-    #[cfg(target_os = "linux")]
-    #[allow(dead_code)]
+    #[cfg(all(target_os = "linux", feature = "yara-scanning"))]
     fn read_process_memory(pid: u32, region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
@@ -472,8 +471,7 @@ impl DynamicYaraEngine {
     }
 
     /// Read memory from a specific process and region (macOS implementation)
-    #[cfg(target_os = "macos")]
-    #[allow(dead_code)]
+    #[cfg(all(target_os = "macos", feature = "yara-scanning"))]
     fn read_process_memory(_pid: u32, _region: &MemoryRegion) -> Result<Vec<u8>, GhostError> {
         Err(GhostError::PlatformNotSupported {
             feature: "Memory reading not implemented for macOS".to_string(),
