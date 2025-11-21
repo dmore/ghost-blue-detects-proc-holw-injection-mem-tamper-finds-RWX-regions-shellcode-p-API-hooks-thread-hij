@@ -171,10 +171,13 @@ impl DynamicYaraEngine {
                         .and_then(|s| s.to_str())
                         .unwrap_or("default");
 
-                    if let Err(e) = compiler.add_rules_str(&content) {
-                        log::error!("Failed to compile {}: {}", rule_file.display(), e);
-                        continue;
-                    }
+                    compiler = match compiler.add_rules_str(&content) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log::error!("Failed to compile {}: {}", rule_file.display(), e);
+                            continue;
+                        }
+                    };
 
                     log::info!("Compiled YARA rule: {}", rule_file.display());
 
