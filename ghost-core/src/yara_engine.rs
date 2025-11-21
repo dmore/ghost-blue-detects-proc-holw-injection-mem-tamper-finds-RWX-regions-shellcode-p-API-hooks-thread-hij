@@ -171,24 +171,28 @@ impl DynamicYaraEngine {
                         .and_then(|s| s.to_str())
                         .unwrap_or("default");
 
-                    compiler = match compiler.add_rules_str(&content) {
-                        Ok(c) => c,
+                    match compiler.add_rules_str(&content) {
+                        Ok(c) => {
+                            compiler = c;
+                            log::info!("Compiled YARA rule: {}", rule_file.display());
+
+                            self.rule_metadata.push(YaraRuleMetadata {
+                                name: namespace.to_string(),
+                                file_path: rule_file.display().to_string(),
+                                threat_level: ThreatLevel::Medium,
+                                last_updated: SystemTime::now(),
+                            });
+
+                            rule_count += 1;
+                        }
                         Err(e) => {
                             log::error!("Failed to compile {}: {}", rule_file.display(), e);
-                            continue;
+                            // Don't continue - compiler was consumed, return with error
+                            return Err(GhostError::Configuration {
+                                message: format!("Failed to compile {}: {}", rule_file.display(), e),
+                            });
                         }
-                    };
-
-                    log::info!("Compiled YARA rule: {}", rule_file.display());
-
-                    self.rule_metadata.push(YaraRuleMetadata {
-                        name: namespace.to_string(),
-                        file_path: rule_file.display().to_string(),
-                        threat_level: ThreatLevel::Medium,
-                        last_updated: SystemTime::now(),
-                    });
-
-                    rule_count += 1;
+                    }
                 }
                 Err(e) => {
                     log::error!("Failed to read {}: {}", rule_file.display(), e);
