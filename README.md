@@ -18,6 +18,17 @@ Some of the things it can detect:
 
 It also maps detected behaviors to the MITRE ATT&CK framework, which is helpful if you're documenting threats or writing reports.
 
+## Screenshots
+
+### Detection Dashboard
+![Ghost TUI - Detection Overview](assets/screenshot1.png)
+
+### Active Threats
+![Detected Malware](assets/screenshot2.png)
+
+### Live Monitoring
+![Real-time Process Analysis Logs](assets/screenshot3.png)
+
 ## Building it
 
 You'll need Rust installed (1.70 or newer). Then:
