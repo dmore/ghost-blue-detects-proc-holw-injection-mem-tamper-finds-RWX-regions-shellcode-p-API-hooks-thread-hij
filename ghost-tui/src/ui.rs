@@ -33,7 +33,7 @@ mod colors {
 use colors::*;
 
 pub fn draw(f: &mut Frame, app: &App) {
-    let size = f.size();
+    let size = f.area();
 
     // Create main layout
     let chunks = Layout::default()
@@ -313,22 +313,24 @@ fn draw_processes(f: &mut Frame, area: Rect, app: &App) {
         })
         .collect();
 
-    let table = Table::new(rows)
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("System Processes")
-                .border_style(Style::default().fg(PRIMARY)),
-        )
-        .highlight_style(Style::default().bg(PRIMARY).fg(BACKGROUND))
-        .widths(&[
+    let table = Table::new(
+        rows,
+        &[
             Constraint::Length(8),
             Constraint::Length(8),
             Constraint::Min(20),
             Constraint::Length(8),
             Constraint::Length(15),
-        ]);
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("System Processes")
+            .border_style(Style::default().fg(PRIMARY)),
+    )
+    .row_highlight_style(Style::default().bg(PRIMARY).fg(BACKGROUND));
 
     let mut state = app.processes_state.clone();
     f.render_stateful_widget(table, chunks[0], &mut state);
