@@ -1,8 +1,7 @@
 """
 Ghost ML - Machine Learning Models for Neural Memory Analysis
 
-This package provides ML models for the Ghost framework's neural memory analyzer,
-integrating with the dragonslayer ML framework.
+This package provides ML models for the Ghost framework's neural memory analyzer.
 """
 
 __version__ = "1.0.0"
