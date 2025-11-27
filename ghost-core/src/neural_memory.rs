@@ -145,7 +145,7 @@ impl NeuralMemoryAnalyzer {
         ];
 
         #[cfg(feature = "neural-ml")]
-        let ml_bridge = MLBridge::new(model_dir).ok();
+        let ml_bridge = Some(MLBridge::new(model_dir));
 
         Ok(NeuralMemoryAnalyzer {
             neural_networks,
@@ -240,8 +240,16 @@ impl NeuralMemoryAnalyzer {
                 },
                 detection_confidence: e.detection_confidence,
             }).collect(),
-            polymorphic_indicators: bridge_result.polymorphic_indicators,
-            memory_anomalies: bridge_result.memory_anomalies,
+            polymorphic_indicators: bridge_result.polymorphic_indicators.into_iter().map(|p| PolymorphicIndicator {
+                mutation_family: p.mutation_family,
+                mutation_generation: p.mutation_generation,
+                mutation_confidence: p.mutation_confidence,
+            }).collect(),
+            memory_anomalies: bridge_result.memory_anomalies.into_iter().map(|a| MemoryAnomaly {
+                anomaly_name: a.anomaly_name,
+                severity_score: a.severity_score,
+                anomaly_description: a.anomaly_description,
+            }).collect(),
             confidence_score: bridge_result.confidence_score,
         }
     }
@@ -501,7 +509,7 @@ impl NeuralMemoryAnalyzer {
     fn detect_memory_anomalies(
         &self,
         features: &[f32],
-        memory_regions: &[MemoryRegion],
+        _memory_regions: &[MemoryRegion],
     ) -> Result<Vec<MemoryAnomaly>, GhostError> {
         let mut anomalies = Vec::new();
         
