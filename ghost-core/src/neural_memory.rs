@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[cfg(feature = "neural-ml")]
-use crate::ml_bridge::{MLBridge, MLAnalysisResult as BridgeResult};
+use crate::ml_bridge::{MLAnalysisResult as BridgeResult, MLBridge};
 
 #[derive(Debug)]
 pub struct NeuralMemoryAnalyzer {
@@ -118,7 +118,7 @@ impl NeuralMemoryAnalyzer {
     pub fn new() -> Result<Self, GhostError> {
         Self::with_model_dir(None)
     }
-    
+
     pub fn with_model_dir(model_dir: Option<PathBuf>) -> Result<Self, GhostError> {
         let neural_networks = vec![
             NeuralNetwork {
@@ -165,17 +165,23 @@ impl NeuralMemoryAnalyzer {
         if let Some(ref bridge) = self.ml_bridge {
             // Try to read memory content for better analysis
             let memory_content = self.read_memory_content(_process, memory_regions).ok();
-            
-            match bridge.analyze_memory_regions(memory_regions, memory_content.as_deref()).await {
+
+            match bridge
+                .analyze_memory_regions(memory_regions, memory_content.as_deref())
+                .await
+            {
                 Ok(bridge_result) => {
                     return Ok(self.convert_bridge_result(bridge_result));
                 }
                 Err(e) => {
-                    log::warn!("ML bridge analysis failed: {}, falling back to basic analysis", e);
+                    log::warn!(
+                        "ML bridge analysis failed: {}, falling back to basic analysis",
+                        e
+                    );
                 }
             }
         }
-        
+
         // Fallback to enhanced feature-based analysis
         let features = self.extract_features(memory_regions)?;
 
@@ -190,10 +196,10 @@ impl NeuralMemoryAnalyzer {
 
         // Analyze evasion techniques
         let evasion_techniques = self.analyze_evasion(&features)?;
-        
+
         // Detect polymorphic indicators
         let polymorphic_indicators = self.detect_polymorphic(&features)?;
-        
+
         // Detect memory anomalies
         let memory_anomalies = self.detect_memory_anomalies(&features, memory_regions)?;
 
@@ -206,72 +212,91 @@ impl NeuralMemoryAnalyzer {
             confidence_score: self.calculate_confidence(&predictions),
         })
     }
-    
+
     #[cfg(feature = "neural-ml")]
     fn convert_bridge_result(&self, bridge_result: BridgeResult) -> NeuralAnalysisResult {
         NeuralAnalysisResult {
             threat_probability: bridge_result.threat_probability,
-            detected_patterns: bridge_result.detected_patterns.into_iter().map(|p| DetectedPattern {
-                pattern_name: p.pattern_name,
-                pattern_type: match p.pattern_type.as_str() {
-                    "Shellcode" => PatternType::Shellcode,
-                    "InjectionVector" => PatternType::InjectionVector,
-                    "PolymorphicCode" => PatternType::PolymorphicCode,
-                    "AntiAnalysis" => PatternType::AntiAnalysis,
-                    _ => PatternType::Shellcode,
-                },
-                confidence: p.confidence,
-            }).collect(),
-            evasion_techniques: bridge_result.evasion_techniques.into_iter().map(|e| DetectedEvasion {
-                evasion_name: e.evasion_name,
-                technique_category: match e.technique_category.as_str() {
-                    "AntiDebugging" => EvasionCategory::AntiDebugging,
-                    "AntiVirtualization" => EvasionCategory::AntiVirtualization,
-                    "CodeObfuscation" => EvasionCategory::CodeObfuscation,
-                    "BehavioralEvasion" => EvasionCategory::BehavioralEvasion,
-                    _ => EvasionCategory::AntiDebugging,
-                },
-                sophistication_level: match e.sophistication_level.as_str() {
-                    "Basic" => SophisticationLevel::Basic,
-                    "Intermediate" => SophisticationLevel::Intermediate,
-                    "Advanced" => SophisticationLevel::Advanced,
-                    "Expert" => SophisticationLevel::Expert,
-                    _ => SophisticationLevel::Basic,
-                },
-                detection_confidence: e.detection_confidence,
-            }).collect(),
-            polymorphic_indicators: bridge_result.polymorphic_indicators.into_iter().map(|p| PolymorphicIndicator {
-                mutation_family: p.mutation_family,
-                mutation_generation: p.mutation_generation,
-                mutation_confidence: p.mutation_confidence,
-            }).collect(),
-            memory_anomalies: bridge_result.memory_anomalies.into_iter().map(|a| MemoryAnomaly {
-                anomaly_name: a.anomaly_name,
-                severity_score: a.severity_score,
-                anomaly_description: a.anomaly_description,
-            }).collect(),
+            detected_patterns: bridge_result
+                .detected_patterns
+                .into_iter()
+                .map(|p| DetectedPattern {
+                    pattern_name: p.pattern_name,
+                    pattern_type: match p.pattern_type.as_str() {
+                        "Shellcode" => PatternType::Shellcode,
+                        "InjectionVector" => PatternType::InjectionVector,
+                        "PolymorphicCode" => PatternType::PolymorphicCode,
+                        "AntiAnalysis" => PatternType::AntiAnalysis,
+                        _ => PatternType::Shellcode,
+                    },
+                    confidence: p.confidence,
+                })
+                .collect(),
+            evasion_techniques: bridge_result
+                .evasion_techniques
+                .into_iter()
+                .map(|e| DetectedEvasion {
+                    evasion_name: e.evasion_name,
+                    technique_category: match e.technique_category.as_str() {
+                        "AntiDebugging" => EvasionCategory::AntiDebugging,
+                        "AntiVirtualization" => EvasionCategory::AntiVirtualization,
+                        "CodeObfuscation" => EvasionCategory::CodeObfuscation,
+                        "BehavioralEvasion" => EvasionCategory::BehavioralEvasion,
+                        _ => EvasionCategory::AntiDebugging,
+                    },
+                    sophistication_level: match e.sophistication_level.as_str() {
+                        "Basic" => SophisticationLevel::Basic,
+                        "Intermediate" => SophisticationLevel::Intermediate,
+                        "Advanced" => SophisticationLevel::Advanced,
+                        "Expert" => SophisticationLevel::Expert,
+                        _ => SophisticationLevel::Basic,
+                    },
+                    detection_confidence: e.detection_confidence,
+                })
+                .collect(),
+            polymorphic_indicators: bridge_result
+                .polymorphic_indicators
+                .into_iter()
+                .map(|p| PolymorphicIndicator {
+                    mutation_family: p.mutation_family,
+                    mutation_generation: p.mutation_generation,
+                    mutation_confidence: p.mutation_confidence,
+                })
+                .collect(),
+            memory_anomalies: bridge_result
+                .memory_anomalies
+                .into_iter()
+                .map(|a| MemoryAnomaly {
+                    anomaly_name: a.anomaly_name,
+                    severity_score: a.severity_score,
+                    anomaly_description: a.anomaly_description,
+                })
+                .collect(),
             confidence_score: bridge_result.confidence_score,
         }
     }
-    
+
     fn read_memory_content(
         &self,
         process: &ProcessInfo,
         memory_regions: &[MemoryRegion],
     ) -> Result<Vec<Vec<u8>>, GhostError> {
         use crate::memory::read_process_memory;
-        
+
         let mut content = Vec::new();
-        
+
         // Read content from executable regions only (for performance)
-        for region in memory_regions.iter().take(10) { // Limit to first 10 regions
+        for region in memory_regions.iter().take(10) {
+            // Limit to first 10 regions
             if region.protection.is_executable() && region.size > 0 && region.size < 1024 * 1024 {
-                if let Ok(data) = read_process_memory(process.pid, region.base_address, region.size.min(1024)) {
+                if let Ok(data) =
+                    read_process_memory(process.pid, region.base_address, region.size.min(1024))
+                {
                     content.push(data);
                 }
             }
         }
-        
+
         Ok(content)
     }
 
@@ -288,14 +313,16 @@ impl NeuralMemoryAnalyzer {
         let avg_size = total_size as f32 / memory_regions.len() as f32;
         let max_size = *sizes.iter().max().unwrap_or(&0) as f32;
         let min_size = *sizes.iter().min().unwrap_or(&0) as f32;
-        
+
         // Calculate standard deviation
-        let variance: f32 = sizes.iter()
+        let variance: f32 = sizes
+            .iter()
             .map(|&s| {
                 let diff = s as f32 - avg_size;
                 diff * diff
             })
-            .sum::<f32>() / memory_regions.len() as f32;
+            .sum::<f32>()
+            / memory_regions.len() as f32;
         let std_size = variance.sqrt();
 
         features.push(memory_regions.len() as f32);
@@ -316,15 +343,27 @@ impl NeuralMemoryAnalyzer {
             .count() as f32;
         let rx_count = memory_regions
             .iter()
-            .filter(|r| r.protection.is_readable() && r.protection.is_executable() && !r.protection.is_writable())
+            .filter(|r| {
+                r.protection.is_readable()
+                    && r.protection.is_executable()
+                    && !r.protection.is_writable()
+            })
             .count() as f32;
         let rw_count = memory_regions
             .iter()
-            .filter(|r| r.protection.is_readable() && r.protection.is_writable() && !r.protection.is_executable())
+            .filter(|r| {
+                r.protection.is_readable()
+                    && r.protection.is_writable()
+                    && !r.protection.is_executable()
+            })
             .count() as f32;
         let r_count = memory_regions
             .iter()
-            .filter(|r| r.protection.is_readable() && !r.protection.is_writable() && !r.protection.is_executable())
+            .filter(|r| {
+                r.protection.is_readable()
+                    && !r.protection.is_writable()
+                    && !r.protection.is_executable()
+            })
             .count() as f32;
 
         features.push(rwx_count);
@@ -333,9 +372,18 @@ impl NeuralMemoryAnalyzer {
         features.push(r_count);
 
         // Region type features
-        let private_count = memory_regions.iter().filter(|r| r.region_type == "PRIVATE").count() as f32;
-        let mapped_count = memory_regions.iter().filter(|r| r.region_type == "MAPPED").count() as f32;
-        let image_count = memory_regions.iter().filter(|r| r.region_type == "IMAGE").count() as f32;
+        let private_count = memory_regions
+            .iter()
+            .filter(|r| r.region_type == "PRIVATE")
+            .count() as f32;
+        let mapped_count = memory_regions
+            .iter()
+            .filter(|r| r.region_type == "MAPPED")
+            .count() as f32;
+        let image_count = memory_regions
+            .iter()
+            .filter(|r| r.region_type == "IMAGE")
+            .count() as f32;
 
         features.push(private_count);
         features.push(mapped_count);
@@ -345,7 +393,7 @@ impl NeuralMemoryAnalyzer {
         if memory_regions.len() > 1 {
             let mut sorted_regions = memory_regions.to_vec();
             sorted_regions.sort_by_key(|r| r.base_address);
-            
+
             let mut gaps = Vec::new();
             for i in 0..sorted_regions.len() - 1 {
                 let end = sorted_regions[i].base_address + sorted_regions[i].size;
@@ -354,7 +402,7 @@ impl NeuralMemoryAnalyzer {
                     gaps.push((next_start - end) as f32);
                 }
             }
-            
+
             if !gaps.is_empty() {
                 let avg_gap = gaps.iter().sum::<f32>() / gaps.len() as f32;
                 let max_gap = gaps.iter().copied().fold(0.0f32, f32::max);
@@ -435,11 +483,11 @@ impl NeuralMemoryAnalyzer {
 
     fn detect_patterns(&self, features: &[f32]) -> Result<Vec<DetectedPattern>, GhostError> {
         let mut patterns = Vec::new();
-        
+
         if features.len() < 10 {
             return Ok(patterns);
         }
-        
+
         // Detect shellcode patterns based on RWX regions
         let rwx_ratio = features.get(15).copied().unwrap_or(0.0);
         if rwx_ratio > 0.1 {
@@ -449,7 +497,7 @@ impl NeuralMemoryAnalyzer {
                 confidence: (rwx_ratio * 0.8).min(0.9),
             });
         }
-        
+
         // Detect injection vectors
         let private_ratio = features.get(17).copied().unwrap_or(0.0);
         let rwx_count = features.get(6).copied().unwrap_or(0.0);
@@ -460,17 +508,17 @@ impl NeuralMemoryAnalyzer {
                 confidence: 0.7,
             });
         }
-        
+
         Ok(patterns)
     }
 
     fn analyze_evasion(&self, features: &[f32]) -> Result<Vec<DetectedEvasion>, GhostError> {
         let mut evasions = Vec::new();
-        
+
         if features.len() < 10 {
             return Ok(evasions);
         }
-        
+
         // Detect anti-analysis based on unusual memory patterns
         let fragmentation = features.get(18).copied().unwrap_or(0.0);
         if fragmentation > 0.5 {
@@ -485,7 +533,7 @@ impl NeuralMemoryAnalyzer {
                 detection_confidence: (fragmentation * 0.8).min(0.9),
             });
         }
-        
+
         // Detect behavioral evasion
         let rwx_ratio = features.get(15).copied().unwrap_or(0.0);
         if rwx_ratio > 0.2 {
@@ -496,47 +544,55 @@ impl NeuralMemoryAnalyzer {
                 detection_confidence: (rwx_ratio * 0.6).min(0.8),
             });
         }
-        
+
         Ok(evasions)
     }
-    
-    fn detect_polymorphic(&self, _features: &[f32]) -> Result<Vec<PolymorphicIndicator>, GhostError> {
+
+    fn detect_polymorphic(
+        &self,
+        _features: &[f32],
+    ) -> Result<Vec<PolymorphicIndicator>, GhostError> {
         // Polymorphic detection requires content analysis, which is done by ML models
         // This is a placeholder for basic heuristics
         Ok(Vec::new())
     }
-    
+
     fn detect_memory_anomalies(
         &self,
         features: &[f32],
         _memory_regions: &[MemoryRegion],
     ) -> Result<Vec<MemoryAnomaly>, GhostError> {
         let mut anomalies = Vec::new();
-        
+
         if features.len() < 10 {
             return Ok(anomalies);
         }
-        
+
         // Excessive RWX regions
         let rwx_count = features.get(6).copied().unwrap_or(0.0);
         if rwx_count > 5.0 {
             anomalies.push(MemoryAnomaly {
                 anomaly_name: "Excessive RWX Regions".to_string(),
                 severity_score: (rwx_count / 10.0).min(0.9),
-                anomaly_description: format!("Found {} RWX memory regions, which is highly unusual", rwx_count as u32),
+                anomaly_description: format!(
+                    "Found {} RWX memory regions, which is highly unusual",
+                    rwx_count as u32
+                ),
             });
         }
-        
+
         // High fragmentation
         let fragmentation = features.get(18).copied().unwrap_or(0.0);
         if fragmentation > 0.6 {
             anomalies.push(MemoryAnomaly {
                 anomaly_name: "High Address Space Fragmentation".to_string(),
                 severity_score: fragmentation,
-                anomaly_description: "Address space shows high fragmentation, possible memory manipulation".to_string(),
+                anomaly_description:
+                    "Address space shows high fragmentation, possible memory manipulation"
+                        .to_string(),
             });
         }
-        
+
         // Irregular region sizes
         let std_size = features.get(3).copied().unwrap_or(0.0);
         let avg_size = features.get(2).copied().unwrap_or(0.0);
@@ -544,19 +600,21 @@ impl NeuralMemoryAnalyzer {
             anomalies.push(MemoryAnomaly {
                 anomaly_name: "Irregular Region Sizes".to_string(),
                 severity_score: 0.6,
-                anomaly_description: "Memory regions show highly irregular size distribution".to_string(),
+                anomaly_description: "Memory regions show highly irregular size distribution"
+                    .to_string(),
             });
         }
-        
+
         Ok(anomalies)
     }
-    
+
     fn calculate_confidence(&self, predictions: &[ModelPrediction]) -> f32 {
         if predictions.is_empty() {
             return 0.0;
         }
-        
-        let avg_confidence: f32 = predictions.iter().map(|p| p.confidence).sum::<f32>() / predictions.len() as f32;
+
+        let avg_confidence: f32 =
+            predictions.iter().map(|p| p.confidence).sum::<f32>() / predictions.len() as f32;
         avg_confidence
     }
 }

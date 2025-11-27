@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-
 /// Result from ML model analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MLAnalysisResult {
@@ -80,7 +79,7 @@ impl MLBridge {
             python_path,
         }
     }
-    
+
     /// Analyze memory regions using ML models
     pub async fn analyze_memory_regions(
         &self,
@@ -88,7 +87,8 @@ impl MLBridge {
         memory_content: Option<&[Vec<u8>]>,
     ) -> Result<MLAnalysisResult, GhostError> {
         if self.use_python {
-            self.analyze_with_subprocess(memory_regions, memory_content).await
+            self.analyze_with_subprocess(memory_regions, memory_content)
+                .await
         } else {
             // Fallback: return empty results
             log::warn!("Python not available, returning empty ML analysis");
@@ -109,9 +109,11 @@ impl MLBridge {
         memory_regions: &[MemoryRegion],
         _memory_content: Option<&[Vec<u8>]>,
     ) -> Result<MLAnalysisResult, GhostError> {
-        let python = self.python_path.as_ref()
+        let python = self
+            .python_path
+            .as_ref()
             .ok_or_else(|| GhostError::Configuration {
-                message: "Python interpreter not found for ML analysis".to_string()
+                message: "Python interpreter not found for ML analysis".to_string(),
             })?;
 
         let script = format!(
@@ -134,10 +136,10 @@ except Exception as e:
 "#,
             self.model_dir.to_string_lossy()
         );
-        
+
         // Serialize memory regions
         let regions_json = serde_json::to_string(memory_regions)?;
-        
+
         // Execute Python script in blocking task
         let python_path = python.clone();
         let script_clone = script.clone();
@@ -151,7 +153,7 @@ except Exception as e:
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()?;
-            
+
             // Write input
             if let Some(mut stdin) = child.stdin.take() {
                 stdin.write_all(regions_json_clone.as_bytes())?;
@@ -162,28 +164,30 @@ except Exception as e:
         })
         .await
         .map_err(|e| GhostError::Configuration {
-            message: format!("Failed to execute ML analysis task: {}", e)
+            message: format!("Failed to execute ML analysis task: {}", e),
         })?
         .map_err(|e| GhostError::Configuration {
-            message: format!("Python ML bridge execution failed: {}", e)
+            message: format!("Python ML bridge execution failed: {}", e),
         })?;
-        
+
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             log::warn!("Python ML script failed: {}", stderr);
         }
-        
-        let stdout = String::from_utf8(output.stdout)
-            .map_err(|e| GhostError::Serialization {
-                message: format!("Invalid UTF-8 in Python output: {}", e)
-            })?;
-        
+
+        let stdout = String::from_utf8(output.stdout).map_err(|e| GhostError::Serialization {
+            message: format!("Invalid UTF-8 in Python output: {}", e),
+        })?;
+
         // Parse result
-        let analysis: MLAnalysisResult = serde_json::from_str(&stdout.trim())
-            .map_err(|e| GhostError::Serialization {
-                message: format!("Failed to deserialize ML analysis result: {} (output: {})", e, stdout)
+        let analysis: MLAnalysisResult =
+            serde_json::from_str(&stdout.trim()).map_err(|e| GhostError::Serialization {
+                message: format!(
+                    "Failed to deserialize ML analysis result: {} (output: {})",
+                    e, stdout
+                ),
             })?;
-        
+
         Ok(analysis)
     }
 }
@@ -192,7 +196,7 @@ except Exception as e:
 fn find_python() -> Option<PathBuf> {
     // Try common Python names
     let candidates = ["python3", "python", "py"];
-    
+
     for candidate in candidates.iter() {
         if let Ok(output) = Command::new(candidate).arg("--version").output() {
             if output.status.success() {
@@ -200,7 +204,7 @@ fn find_python() -> Option<PathBuf> {
             }
         }
     }
-    
+
     None
 }
 
@@ -209,4 +213,3 @@ impl Default for MLBridge {
         Self::new(None)
     }
 }
-
