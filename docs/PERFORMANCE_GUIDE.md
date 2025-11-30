@@ -8,17 +8,20 @@ Ghost is designed for process injection detection with configurable performance 
 
 ### Expected Detection Engine Performance
 
+Performance targets (not yet validated with comprehensive benchmarks):
+
 - **Process Enumeration**: 10-50ms for all system processes
 - **Memory Region Analysis**: 1-5ms per process (platform-dependent)
 - **Thread Enumeration**: 1-10ms per process
 - **Detection Heuristics**: <1ms per process
 - **Memory Usage**: ~10-20MB for core engine
 
-**Note**: Actual performance varies significantly by:
+**Note**: These are target metrics. Actual performance varies by:
 - Number of processes (100-1000+ typical)
 - Memory region count per process
 - Thread count per process
-- Platform (Windows APIs vs Linux procfs)
+- Platform (Windows APIs vs Linux procfs vs macOS mach)
+- Whether optional features like YARA scanning are enabled
 
 ### Configuration Options
 
@@ -117,8 +120,9 @@ cargo test -- --nocapture
 
 ### macOS
 
-- Limited functionality (process enumeration only)
-- Most detection features require kernel extensions or Endpoint Security framework
+- Run with sudo for memory reading (requires task_for_pid privileges)
+- Memory enumeration and reading work but thread analysis is not implemented
+- Some detection features would require kernel extensions or Endpoint Security framework
 
 ## Troubleshooting Performance Issues
 

@@ -144,12 +144,12 @@ Ghost detection engine coverage mapped to MITRE ATT&CK framework techniques.
 1. **Memory Analysis** (memory.rs)
    - Windows: VirtualQueryEx, ReadProcessMemory
    - Linux: /proc/[pid]/maps parsing, /proc/[pid]/mem reading
-   - macOS: Not implemented
+   - macOS: mach_vm_region, mach_vm_read_overwrite
 
 2. **Thread Analysis** (thread.rs)
    - Windows: Thread32First/Next, NtQueryInformationThread, GetThreadTimes
    - Linux: /proc/[pid]/task enumeration, stat parsing
-   - macOS: Not implemented
+   - macOS: Not implemented (task_threads needed)
 
 3. **Hook Detection** (hooks.rs)
    - Windows: Inline hook detection via JMP pattern scanning
@@ -172,12 +172,15 @@ Ghost detection engine coverage mapped to MITRE ATT&CK framework techniques.
 
 ### What's NOT Implemented
 
-- Actual shellcode signature database
-- Entropy analysis for obfuscation detection
 - SetWindowsHookEx chain parsing (Windows)
-- APC injection detection
-- MITRE ATT&CK technique attribution (framework only)
+- APC injection detection (Windows)
+- IAT/EAT hook scanning (only inline hooks detected)
 - process_vm_writev monitoring (Linux)
+- Thread enumeration on macOS
+- Automatic MITRE ATT&CK technique attribution (framework exists but no inference logic)
+- ML-based behavioral analysis (requires trained models)
+- Live threat intelligence feeds (framework exists but no connections)
+- eBPF kernel monitoring (stub implementation behind feature flag)
 
 ## Future Enhancements
 

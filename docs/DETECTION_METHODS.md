@@ -127,8 +127,8 @@ Ghost uses weighted confidence scoring:
 
 - [x] Process enumeration (sysctl KERN_PROC_ALL)
 - [x] Process path retrieval (proc_pidpath)
-- [ ] Memory enumeration (vm_region)
-- [ ] Memory reading (vm_read)
+- [x] Memory enumeration (mach_vm_region)
+- [x] Memory reading (mach_vm_read_overwrite)
 - [ ] Thread enumeration (task_threads)
 - [ ] DYLD_INSERT_LIBRARIES detection
 - [ ] task_for_pid monitoring
