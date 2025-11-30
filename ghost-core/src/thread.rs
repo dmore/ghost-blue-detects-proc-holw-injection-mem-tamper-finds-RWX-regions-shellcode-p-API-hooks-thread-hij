@@ -972,7 +972,7 @@ mod platform {
 ///
 /// - **Windows**: Uses CreateToolhelp32Snapshot with NtQueryInformationThread for start addresses.
 /// - **Linux**: Parses /proc/\[pid\]/task/ directory.
-/// - **macOS**: Not yet implemented.
+/// - **macOS**: Uses task_threads and thread_info to enumerate threads. Requires root or taskgated entitlement.
 ///
 /// # Returns
 ///

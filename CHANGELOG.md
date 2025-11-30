@@ -11,19 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ebpf-detection feature flag for optional eBPF support (stub implementation)
 - TODO markers throughout codebase for stub implementations
 - Comprehensive documentation of limitations and unimplemented features
+- Test coverage for shellcode detection (11 unit tests)
+- Test coverage for memory protection detection (11 unit tests)
 
 ### Fixed
 - Replaced simulated memory reading with real process memory access
 - Detection engine now reads actual process memory instead of fake data
 - Security vulnerability RUSTSEC-2025-0020 in pyo3 dependency
 - Clippy warnings for CI compliance
+- Documentation now correctly shows macOS thread enumeration is implemented
 
 ### Changed
 - Updated README to accurately reflect platform support and limitations
 - Documented that ML features require trained models
 - Clarified performance metrics are targets, not validated benchmarks
 - Updated technical documentation for implementation accuracy
-- macOS memory reading now properly documented as implemented
+- macOS memory reading and thread enumeration now properly documented as implemented
 
 ## [0.1.0] - 2024-11-20
 
@@ -52,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ML features are simulated without trained models
 - eBPF support is stub implementation only
 - Threat intelligence has no active feed connections
-- macOS has limited functionality (no thread enumeration)
+- macOS has limited functionality (no hook detection)
 - Performance claims not validated with benchmarks
 
 [Unreleased]: https://github.com/pandaadir05/ghost/compare/v0.1.0...HEAD
