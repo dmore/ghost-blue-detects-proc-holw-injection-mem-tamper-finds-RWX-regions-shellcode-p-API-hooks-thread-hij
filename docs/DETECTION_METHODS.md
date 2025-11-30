@@ -95,10 +95,12 @@ Detects dynamic library injection on macOS via the DYLD_INSERT_LIBRARIES environ
 
 **MITRE ATT&CK**: T1055.003
 
-Framework for detecting inline hooks in critical macOS system library functions.
+Detects inline hooks in critical macOS system library functions.
 
 **Detection Logic**:
 - Enumerate loaded libraries using vmmap
+- Resolve function addresses using nm and library base addresses
+- Read function entry point bytes from target process memory
 - Check critical APIs in libsystem_kernel.dylib, libsystem_c.dylib, and libdyld.dylib
 - Scan for hook patterns (JMP instructions on x86_64, branch instructions on ARM64)
 - Support both Intel and Apple Silicon architectures
@@ -108,8 +110,6 @@ Framework for detecting inline hooks in critical macOS system library functions.
 - task_for_pid, thread_create
 - system, popen, execve
 - dlopen, dlsym
-
-**Note**: Function address resolution requires dyld_info integration (partial implementation)
 
 **Platform**: macOS only
 
@@ -167,7 +167,7 @@ Ghost uses weighted confidence scoring:
 - [x] Memory reading (mach_vm_read_overwrite)
 - [x] Thread enumeration (task_threads with thread_basic_info)
 - [x] DYLD_INSERT_LIBRARIES detection
-- [x] Inline hook detection framework (partial - requires dyld_info integration)
+- [x] Inline hook detection (nm-based function address resolution)
 - [ ] task_for_pid monitoring
 - [ ] Mach port analysis
 

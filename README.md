@@ -135,7 +135,7 @@ This is a userspace tool with the following limitations:
 - **Machine learning features**: Neural network analysis and behavioral ML predictions are simulated and require trained models to be functional
 - **Threat intelligence**: The threat intelligence framework exists but has no active feed connections or IOC database
 - **False positives**: Legitimate software like game anti-cheat, debuggers, sandboxes, and browsers with JIT compilers may trigger detections due to their memory manipulation techniques
-- **macOS**: Hook detection partially implemented with DYLD_INSERT_LIBRARIES and inline hook detection framework. Function address resolution via dyld_info not yet integrated
+- **macOS**: Hook detection fully implemented with DYLD_INSERT_LIBRARIES and inline hook detection using nm-based function address resolution
 - **Performance claims**: Documented performance metrics are targets and have not been validated through comprehensive benchmarks
 
 ## Documentation
