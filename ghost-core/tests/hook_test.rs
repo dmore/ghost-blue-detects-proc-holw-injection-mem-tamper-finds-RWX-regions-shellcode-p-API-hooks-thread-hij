@@ -2,20 +2,14 @@
 
 #[cfg(test)]
 mod tests {
-    use ghost_core::hooks::{HookDetector, HookType};
-
-    #[test]
-    fn test_hook_detector_creation() {
-        let detector = HookDetector::new();
-        assert!(detector.is_ok());
-    }
+    use ghost_core::hooks::{detect_hook_injection, HookType};
 
     #[test]
     fn test_hook_type_display() {
-        assert_eq!(format!("{}", HookType::InlineHook), "Inline Hook");
-        assert_eq!(format!("{}", HookType::IatHook), "IAT Hook");
+        assert_eq!(format!("{}", HookType::InlineHook), "InlineHook");
+        assert_eq!(format!("{}", HookType::IATHook), "IATHook");
         assert_eq!(format!("{}", HookType::LdPreload), "LD_PRELOAD");
-        assert_eq!(format!("{}", HookType::Ptrace), "ptrace");
+        assert_eq!(format!("{}", HookType::PtraceInjection), "PtraceInjection");
         assert_eq!(
             format!("{}", HookType::DyldInsertLibraries),
             "DYLD_INSERT_LIBRARIES"
@@ -26,10 +20,9 @@ mod tests {
     #[test]
     fn test_dyld_detection_clean_process() {
         // Test on current process which should not have DYLD_INSERT_LIBRARIES
-        let detector = HookDetector::new().expect("Failed to create detector");
         let current_pid = std::process::id();
 
-        let result = detector.detect_hooks(current_pid);
+        let result = detect_hook_injection(current_pid);
         assert!(result.is_ok());
 
         let hook_result = result.unwrap();
@@ -55,10 +48,9 @@ mod tests {
     #[test]
     fn test_inline_hook_detection_framework() {
         // Test that inline hook detection runs without crashing
-        let detector = HookDetector::new().expect("Failed to create detector");
         let current_pid = std::process::id();
 
-        let result = detector.detect_hooks(current_pid);
+        let result = detect_hook_injection(current_pid);
         assert!(result.is_ok());
 
         // Inline hook detection framework should be present
@@ -70,10 +62,9 @@ mod tests {
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn test_hook_detector_on_current_platform() {
-        let detector = HookDetector::new().expect("Failed to create detector");
         let current_pid = std::process::id();
 
-        let result = detector.detect_hooks(current_pid);
+        let result = detect_hook_injection(current_pid);
         // Should succeed on all platforms
         assert!(result.is_ok());
     }
