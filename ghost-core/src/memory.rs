@@ -838,7 +838,7 @@ mod platform {
 ///
 /// - **Windows**: Uses VirtualQueryEx to enumerate regions.
 /// - **Linux**: Parses /proc/\[pid\]/maps.
-/// - **macOS**: Not yet implemented.
+/// - **macOS**: Uses mach_vm_region to enumerate regions.
 pub fn enumerate_memory_regions(pid: u32) -> anyhow::Result<Vec<MemoryRegion>> {
     platform::enumerate_memory_regions(pid)
 }
@@ -852,7 +852,7 @@ pub fn enumerate_memory_regions(pid: u32) -> anyhow::Result<Vec<MemoryRegion>> {
 ///
 /// - **Windows**: Uses ReadProcessMemory API.
 /// - **Linux**: Reads from /proc/\[pid\]/mem.
-/// - **macOS**: Not yet implemented.
+/// - **macOS**: Uses mach_vm_read_overwrite to read memory. Requires sudo or proper entitlements.
 pub fn read_process_memory(pid: u32, address: usize, size: usize) -> anyhow::Result<Vec<u8>> {
     platform::read_process_memory(pid, address, size)
 }
