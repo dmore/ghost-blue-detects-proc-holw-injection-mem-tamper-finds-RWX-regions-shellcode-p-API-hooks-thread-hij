@@ -29,6 +29,10 @@ impl ShellcodeDetector {
         detector
     }
 
+    pub fn signature_count(&self) -> usize {
+        self.signatures.len()
+    }
+
     fn initialize_signatures(&mut self) {
         // ===== PEB/TEB Access Patterns (Windows) =====
 

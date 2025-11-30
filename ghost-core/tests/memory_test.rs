@@ -69,7 +69,7 @@ mod tests {
         let display = format!("{}", region);
         assert!(display.contains("RWX"));
         assert!(display.contains("PRIVATE"));
-        assert!(display.contains("0x10000000"));
+        assert!(display.contains("0x0000001000000"));
     }
 
     #[test]

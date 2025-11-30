@@ -14,8 +14,9 @@ mod tests {
     fn test_detect_x86_peb_access() {
         let detector = ShellcodeDetector::new();
 
-        // x86 PEB access: mov edx, fs:[0x30]
-        let shellcode = vec![0x64, 0x8B, 0x15, 0x30, 0x00, 0x00, 0x00];
+        // x86 PEB access: mov edx, fs:[0x30] followed by some NOPs
+        let mut shellcode = vec![0x64, 0x8B, 0x15, 0x30, 0x00, 0x00, 0x00];
+        shellcode.extend_from_slice(&[0x90; 10]); // Add NOPs to reach minimum length
 
         let detections = detector.scan_memory_region(&shellcode, 0x10000000);
         assert!(
@@ -32,8 +33,9 @@ mod tests {
     fn test_detect_x64_peb_access() {
         let detector = ShellcodeDetector::new();
 
-        // x64 PEB access: mov rax, gs:[0x60]
-        let shellcode = vec![0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00];
+        // x64 PEB access: mov rax, gs:[0x60] followed by some NOPs
+        let mut shellcode = vec![0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00];
+        shellcode.extend_from_slice(&[0x90; 8]); // Add NOPs to reach minimum length
 
         let detections = detector.scan_memory_region(&shellcode, 0x10000000);
         assert!(
@@ -46,8 +48,9 @@ mod tests {
     fn test_detect_metasploit_signature() {
         let detector = ShellcodeDetector::new();
 
-        // Common Metasploit pattern: CLD; SUB ESP
-        let shellcode = vec![0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8];
+        // Common Metasploit pattern: CLD; SUB ESP followed by some NOPs
+        let mut shellcode = vec![0xFC, 0x48, 0x83, 0xE4, 0xF0, 0xE8];
+        shellcode.extend_from_slice(&[0x90; 11]); // Add NOPs to reach minimum length
 
         let detections = detector.scan_memory_region(&shellcode, 0x10000000);
         assert!(!detections.is_empty(), "Should detect Metasploit pattern");

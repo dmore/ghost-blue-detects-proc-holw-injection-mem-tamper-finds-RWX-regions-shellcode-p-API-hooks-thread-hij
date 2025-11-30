@@ -10,6 +10,3 @@ harness = false
 [dependencies]
 ghost-core = { path = "../ghost-core" }
 criterion = { version = "0.5", features = ["html_reports"] }
-
-[dev-dependencies]
-pprof = { version = "0.13", features = ["criterion", "flamegraph"] }

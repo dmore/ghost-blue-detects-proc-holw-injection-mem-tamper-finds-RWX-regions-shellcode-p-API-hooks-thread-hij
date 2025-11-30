@@ -27,7 +27,7 @@ fn create_memory_regions(count: usize) -> Vec<MemoryRegion> {
 }
 
 fn bench_detection_engine(c: &mut Criterion) {
-    let mut engine = DetectionEngine::new();
+    let mut engine = DetectionEngine::new().expect("Failed to create detection engine");
     let process = create_test_process();
 
     c.bench_function("process_analysis_small", |b| {
