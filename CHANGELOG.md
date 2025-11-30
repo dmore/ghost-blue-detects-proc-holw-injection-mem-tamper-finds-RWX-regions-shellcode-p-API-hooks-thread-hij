@@ -8,59 +8,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- ebpf-detection feature flag for optional eBPF support (stub implementation)
+- TODO markers throughout codebase for stub implementations
+- Comprehensive documentation of limitations and unimplemented features
+
+### Fixed
+- Replaced simulated memory reading with real process memory access
+- Detection engine now reads actual process memory instead of fake data
+- Security vulnerability RUSTSEC-2025-0020 in pyo3 dependency
+- Clippy warnings for CI compliance
+
+### Changed
+- Updated README to accurately reflect platform support and limitations
+- Documented that ML features require trained models
+- Clarified performance metrics are targets, not validated benchmarks
+- Updated technical documentation for implementation accuracy
+- macOS memory reading now properly documented as implemented
+
+## [0.1.0] - 2024-11-20
+
+### Added
 - Initial release of Ghost process injection detection framework
 - Cross-platform process enumeration (Windows, Linux, macOS)
 - Memory analysis and RWX region detection
-- Shellcode pattern detection
+- Shellcode pattern detection with 30+ signatures
 - Process hollowing detection with PE header validation
-- MITRE ATT&CK technique mapping
-- Threat intelligence correlation framework
+- MITRE ATT&CK technique mapping framework
+- Threat intelligence correlation framework (no active feeds)
 - Terminal UI (TUI) for interactive monitoring
 - Command-line interface (CLI) for automation
 - Configuration file support (TOML)
 - JSON output format support
 - Hook detection (inline hooks, LD_PRELOAD, ptrace)
-- Thread analysis and enumeration
+- Thread analysis and enumeration (Windows, Linux)
 - Evasion technique detection framework
-- Behavioral anomaly detection
-- YARA rule engine integration (framework)
+- Behavioral anomaly detection (heuristic-based)
+- YARA rule engine integration (optional feature)
 - Event streaming and correlation system
 - CI/CD pipeline with GitHub Actions
 - Comprehensive documentation
 
-### Fixed
-- All compilation errors resolved
-- Borrow checker issues in TUI
-- Missing Debug trait implementations
-- Async/await compatibility with tokio
-- Generic type inference in UI rendering
-- Platform-specific import warnings
-- Test suite compilation errors
-- ThreatLevel ordering comparison support
-- DetectionConfig validate method visibility
-- Unused variable warnings across codebase
-
-### Changed
-- Improved error handling consistency
-- Enhanced code documentation
-- Optimized memory scanning performance
-- Standardized naming conventions
-- Updated test suite to match current API
-- Implemented macOS memory reading via mach APIs (vm_read)
-- Added Debug trait derives to threat intelligence structures
-- Disabled outdated tests (marked with TODO for updates)
-
-## [0.1.0] - 2024-11-20
-
-### Initial Development Release
-
-- Core detection engine functional
-- Windows support complete
-- Linux support partial (procfs-based)
-- macOS support limited (enumeration only)
-- TUI and CLI interfaces working
-- Professional codebase structure
-- Clean compilation on all platforms
+### Known Limitations
+- ML features are simulated without trained models
+- eBPF support is stub implementation only
+- Threat intelligence has no active feed connections
+- macOS has limited functionality (no thread enumeration)
+- Performance claims not validated with benchmarks
 
 [Unreleased]: https://github.com/pandaadir05/ghost/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/pandaadir05/ghost/releases/tag/v0.1.0
