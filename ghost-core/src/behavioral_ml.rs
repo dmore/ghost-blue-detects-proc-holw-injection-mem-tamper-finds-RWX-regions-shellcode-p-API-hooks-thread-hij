@@ -1,3 +1,7 @@
+// TODO: Behavioral ML module - currently stub implementation
+// TODO: All prediction methods return hardcoded values instead of real ML inference
+// TODO: Requires trained models and actual ML framework integration
+
 use crate::{GhostError, MemoryRegion, ProcessInfo, ThreadInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -227,21 +231,27 @@ impl AdvancedBehavioralML {
         Ok(features)
     }
 
+    /// TODO: Stub implementation - returns hardcoded threat probability
     async fn predict_threat(&self, _features: &[f32]) -> Result<f32, GhostError> {
-        // Simulate ensemble prediction
-        Ok(0.3) // Low threat probability
+        // TODO: Real implementation should use actual trained ML models for threat prediction
+        Ok(0.3)
     }
 
+    /// TODO: Stub implementation - returns empty anomaly list
     fn detect_anomalies(&self, _features: &[f32]) -> Result<Vec<BehavioralAnomaly>, GhostError> {
-        Ok(Vec::new()) // No anomalies detected
+        // TODO: Real implementation should use anomaly detection algorithms
+        Ok(Vec::new())
     }
 
+    /// TODO: Stub implementation - returns empty technique list
     fn predict_techniques(&self, _features: &[f32]) -> Result<Vec<PredictedTechnique>, GhostError> {
-        Ok(Vec::new()) // No techniques predicted
+        // TODO: Real implementation should use ML models to predict attack techniques
+        Ok(Vec::new())
     }
 
+    /// TODO: Stub implementation - simulates model updates without actual training
     pub async fn update_models(&mut self) -> Result<usize, GhostError> {
-        // Simulate model updates
+        // TODO: Real implementation should perform actual model retraining with new data
         for model in &mut self.models {
             model.last_training = SystemTime::now();
         }

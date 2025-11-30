@@ -1,3 +1,6 @@
+// TODO: Neural memory analyzer - uses simulated predictions when ML models are not available
+// TODO: The simulate_neural_inference method returns hardcoded values based on network accuracy
+
 use crate::{GhostError, MemoryRegion, ProcessInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -449,12 +452,15 @@ impl NeuralMemoryAnalyzer {
         Ok(predictions)
     }
 
+    /// TODO: Stub implementation - returns simulated predictions based on network accuracy
+    /// This method is used when real ML models are not available or not trained
     async fn simulate_neural_inference(
         &self,
         network: &NeuralNetwork,
         _features: &[f32],
     ) -> Result<ModelPrediction, GhostError> {
-        let prediction = network.accuracy * 0.5; // Simulate prediction
+        // TODO: Real implementation should use actual neural network inference
+        let prediction = network.accuracy * 0.5;
 
         Ok(ModelPrediction {
             model_id: network.network_id.clone(),

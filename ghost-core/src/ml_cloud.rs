@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+// TODO: Cloud ML engine - minimal stub implementation
+// TODO: No actual cloud ML backend or model serving infrastructure
+// TODO: Inference methods would need real HTTP client and cloud endpoint integration
+
 use crate::{GhostError, MemoryRegion, ProcessInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

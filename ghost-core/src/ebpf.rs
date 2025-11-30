@@ -1,5 +1,7 @@
-// eBPF module - currently stub implementation for Linux
-// Most functionality not yet implemented
+// TODO: eBPF module - currently stub implementation for Linux
+// TODO: Most functionality not yet implemented - requires actual eBPF program loading and kernel integration
+// TODO: All bytecode generation functions return placeholder data
+// TODO: Event processing is simulated and does not reflect real kernel events
 
 #[cfg(target_os = "linux")]
 use crate::ProcessInfo;
@@ -731,40 +733,52 @@ impl EbpfDetector {
     }
 
     /// Compile eBPF bytecode for process creation monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_process_create_program(&self) -> Result<Vec<u8>, EbpfError> {
-        // In a real implementation, this would compile eBPF C code
-        // For now, return placeholder bytecode
-        Ok(vec![0; 512]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 512])
     }
 
     /// Compile eBPF bytecode for process exit monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_process_exit_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 512]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 512])
     }
 
     /// Compile eBPF bytecode for memory mapping monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_mmap_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 1024]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 1024])
     }
 
     /// Compile eBPF bytecode for memory protection monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_mprotect_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 1024]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 1024])
     }
 
     /// Compile eBPF bytecode for ptrace monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_ptrace_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 1024]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 1024])
     }
 
     /// Compile eBPF bytecode for /proc/mem monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_proc_mem_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 1024]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 1024])
     }
 
     /// Compile eBPF bytecode for syscall monitoring
+    /// TODO: Stub implementation - returns placeholder bytecode instead of real BPF instructions
     fn compile_syscall_program(&self) -> Result<Vec<u8>, EbpfError> {
-        Ok(vec![0; 2048]) // Placeholder
+        // TODO: Real implementation should compile actual eBPF C code or use libbpf
+        Ok(vec![0; 2048])
     }
 
     /// Get detection statistics

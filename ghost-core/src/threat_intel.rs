@@ -1,5 +1,10 @@
 #![allow(dead_code)]
 
+// TODO: Threat intelligence module - framework only, no real feed connections
+// TODO: All feed parsing methods return empty vectors (no actual IOC data)
+// TODO: Attribution engine has no real attribution logic implemented
+// TODO: Reputation cache has no actual threat intelligence sources
+
 use crate::{DetectionResult, ThreatLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -408,8 +413,8 @@ impl ThreatIntelligence {
                 .unwrap_or_default()
                 >= feed.update_interval
             {
-                // Fetch data inline to avoid borrow issues
-                let iocs = Vec::new(); // Stub implementation
+                // TODO: Stub implementation - should fetch actual IOC data from feeds
+                let iocs = Vec::new();
                 updates.push((idx, iocs));
             }
         }
@@ -435,30 +440,30 @@ impl ThreatIntelligence {
         }
     }
 
+    /// TODO: Stub implementation - should fetch and parse JSON feed from URL
     async fn fetch_json_feed(
         &self,
         _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
-        // Placeholder implementation
-        // In a real implementation, this would fetch from the feed URL
+        // TODO: Real implementation should use reqwest to fetch from feed URL and parse JSON
         Ok(Vec::new())
     }
 
+    /// TODO: Stub implementation - should fetch and parse STIX/TAXII feed
     async fn fetch_stix_feed(
         &self,
         _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
-        // Placeholder implementation
-        // In a real implementation, this would parse STIX/TAXII data
+        // TODO: Real implementation should integrate with STIX/TAXII protocol
         Ok(Vec::new())
     }
 
+    /// TODO: Stub implementation - should fetch and parse CSV threat data
     async fn fetch_csv_feed(
         &self,
         _feed: &ThreatFeed,
     ) -> Result<Vec<IndicatorOfCompromise>, Box<dyn std::error::Error>> {
-        // Placeholder implementation
-        // In a real implementation, this would parse CSV threat data
+        // TODO: Real implementation should parse CSV format threat intelligence
         Ok(Vec::new())
     }
 

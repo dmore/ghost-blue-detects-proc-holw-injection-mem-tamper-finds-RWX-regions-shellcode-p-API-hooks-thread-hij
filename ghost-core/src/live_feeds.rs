@@ -1,3 +1,7 @@
+// TODO: Live threat feeds module - stub implementation with no actual feed connections
+// TODO: Feed update methods do not connect to real threat intelligence sources
+// TODO: All IOC lookups return empty results
+
 use crate::GhostError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
